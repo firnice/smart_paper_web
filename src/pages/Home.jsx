@@ -2,6 +2,7 @@ import FlowStepCard from "../components/FlowStepCard.jsx";
 import FeatureCard from "../components/FeatureCard.jsx";
 import StackItem from "../components/StackItem.jsx";
 import StatusPanel from "../components/StatusPanel.jsx";
+import DemoPanel from "../components/DemoPanel.jsx";
 import { BRAND, FEATURES, PIPELINE_STEPS, TECH_STACK } from "../constants/content.js";
 
 export default function Home() {
@@ -12,17 +13,19 @@ export default function Home() {
         <h1>{BRAND.headline}</h1>
         <p>{BRAND.description}</p>
         <div className="hero-actions">
-          <button className="btn-primary" type="button">开始体验</button>
-          <button className="btn-ghost" type="button">查看流程</button>
+          <a className="btn-primary" href="#demo">开始体验</a>
+          <a className="btn-ghost" href="#pipeline">查看流程</a>
         </div>
       </header>
+
+      <DemoPanel />
 
       <section className="section">
         <div className="section-head">
           <h2>核心流程</h2>
           <p>从拍照录入到变式题输出，全流程自动化。</p>
         </div>
-        <div className="grid">
+        <div className="grid" id="pipeline">
           {PIPELINE_STEPS.map((step) => (
             <FlowStepCard key={step.title} step={step} />
           ))}
