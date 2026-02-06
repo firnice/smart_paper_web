@@ -35,7 +35,7 @@ export default function StudentLoginPage() {
       <header className="hero">
         <div className="hero-tag">学生登录</div>
         <h1>进入个人错题本</h1>
-        <p>先做一个简单校验：姓名必填，学号和年级用于辅助验证。</p>
+        <p>先做一个简单校验：姓名必填，学号和年级用于辅助验证。首次登录会自动创建学生档案。</p>
       </header>
 
       <section className="student-auth-card">

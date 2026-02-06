@@ -13,8 +13,26 @@ async function requestJson(path, options = {}, query = {}) {
   const url = buildUrl(path, query);
   const response = await fetch(url, options);
   if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || `Request failed: ${response.status}`);
+    const raw = await response.text();
+    if (!raw) {
+      throw new Error(`Request failed: ${response.status}`);
+    }
+    let parsed = null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      throw new Error(raw || `Request failed: ${response.status}`);
+    }
+
+    const detail = parsed?.detail;
+    if (typeof detail === "string" && detail.trim()) {
+      throw new Error(detail);
+    }
+    if (Array.isArray(detail) && detail.length > 0) {
+      const message = detail.map((item) => item?.msg).filter(Boolean).join("; ");
+      throw new Error(message || raw);
+    }
+    throw new Error(raw || `Request failed: ${response.status}`);
   }
   return response.json();
 }
