@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { checkHealth } from "../services/api";
+import { checkHealth } from "../../services/api.js";
 
 export default function StatusPanel() {
   const [status, setStatus] = useState("idle");

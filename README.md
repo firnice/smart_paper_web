@@ -13,18 +13,30 @@ JuYiFanSan (Smart Paper) 前端工程，聚焦小学错题整理与变式题生�
 
 ```
 src/
-  components/    # UI 组件
-  constants/     # 文案与配置
-  pages/         # 页面
-  services/      # API 调用
+  app/                 # 应用入口和路由
+  components/
+    home/              # 首页展示组件
+    paper/             # 错题纸张视图组件
+  constants/           # 首页文案和静态配置
+  context/             # 全局状态（PaperContext）
+  pages/
+    paper/             # 上传页、结果页
+  services/            # API 调用封装
+  styles/              # 全局样式
+  utils/               # 通用工具方法
 ```
+
+详细规范见：`docs/CODE_LAYOUT.md`
 
 ## 开发
 
 ```bash
 npm install
 npm run dev
+npm run build
 ```
+
+> 所有命令需在 `lf-smart-paper-web/` 仓库根目录执行。
 
 ## 环境变量
 
