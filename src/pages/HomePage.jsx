@@ -14,6 +14,7 @@ export default function HomePage() {
         <p>{BRAND.description}</p>
         <div className="hero-actions">
           <Link className="btn-primary" to="/upload">开始体验</Link>
+          <Link className="btn-ghost" to="/student/login">学生登录</Link>
           <Link className="btn-ghost" to="/workspace">进入管理台</Link>
           <a className="btn-ghost" href="#pipeline">查看流程</a>
         </div>

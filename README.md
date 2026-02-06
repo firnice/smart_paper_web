@@ -47,6 +47,8 @@ npm run build
 - `/upload`：OCR 上传页
 - `/result`：错题识别与导出页
 - `/workspace`：用户/错题/统计管理台
+- `/student/login`：学生简版登录
+- `/student/dashboard`：学生错题与统计看板
 
 ## 环境变量
 

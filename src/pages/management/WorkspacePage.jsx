@@ -87,10 +87,10 @@ export default function WorkspacePage() {
 
   const refreshUsersAndMeta = async () => {
     const [usersData, subjectsData, categoriesData, reasonsData] = await Promise.all([
-      listUsers({ limit: 200 }),
-      listSubjects({ active_only: true, limit: 200 }),
-      listWrongQuestionCategories({ limit: 200 }),
-      listErrorReasons({ limit: 200 }),
+      listUsers({ limit: 100 }),
+      listSubjects({ active_only: true, limit: 100 }),
+      listWrongQuestionCategories({ limit: 100 }),
+      listErrorReasons({ limit: 100 }),
     ]);
 
     setUsers(usersData.items ?? []);
@@ -116,7 +116,7 @@ export default function WorkspacePage() {
   };
 
   const refreshWrongQuestions = async (studentId) => {
-    const query = studentId ? { student_id: studentId, limit: 200 } : { limit: 200 };
+    const query = studentId ? { student_id: studentId, limit: 100 } : { limit: 100 };
     const data = await listWrongQuestions(query);
     setWrongQuestions(data.items ?? []);
     const firstWrongQuestionId = data.items?.[0]?.id;

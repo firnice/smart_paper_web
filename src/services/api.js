@@ -138,3 +138,11 @@ export async function getStatisticsOverview(studentId, params = {}) {
     ...params,
   });
 }
+
+export async function studentLogin(payload) {
+  return requestJson("/api/auth/student-login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
