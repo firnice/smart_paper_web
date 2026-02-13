@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { studentLogin } from "../../services/api.js";
+import { demoStudentLogin } from "../../services/studentDemo.js";
 import { saveStudentSession } from "../../utils/studentSession.js";
 
 export default function StudentLoginPage() {
@@ -16,7 +16,7 @@ export default function StudentLoginPage() {
     setLoading(true);
     setError("");
     try {
-      const data = await studentLogin({
+      const data = demoStudentLogin({
         name,
         student_no: studentNo || undefined,
         grade: grade || undefined,
@@ -33,9 +33,9 @@ export default function StudentLoginPage() {
   return (
     <div className="page student-auth-page">
       <header className="hero">
-        <div className="hero-tag">学生登录</div>
-        <h1>进入个人错题本</h1>
-        <p>先做一个简单校验：姓名必填，学号和年级用于辅助验证。首次登录会自动创建学生档案。</p>
+        <div className="hero-tag">学生登录（Demo）</div>
+        <h1>错题本登录</h1>
+        <p>前端演示模式：不依赖后端。姓名必填，首次登录会自动创建学生档案。</p>
       </header>
 
       <section className="student-auth-card">
@@ -60,7 +60,6 @@ export default function StudentLoginPage() {
         {error && <div className="workspace-alert error">{error}</div>}
         <div className="hero-actions">
           <Link className="btn-ghost" to="/">回首页</Link>
-          <Link className="btn-ghost" to="/workspace">管理台</Link>
         </div>
       </section>
     </div>

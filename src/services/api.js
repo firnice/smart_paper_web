@@ -1,7 +1,23 @@
-const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
+function trimTrailingSlash(url) {
+  return String(url).replace(/\/+$/, "");
+}
 
-function buildUrl(path, query = {}) {
-  const url = new URL(`${API_BASE}${path}`);
+function resolveApiBase() {
+  const configured = import.meta.env.VITE_API_BASE;
+  if (configured && String(configured).trim()) {
+    return trimTrailingSlash(configured);
+  }
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return trimTrailingSlash(window.location.origin);
+  }
+  return "http://localhost:8000";
+}
+
+const API_BASE = resolveApiBase();
+
+function buildUrl(path, query = {}, base = API_BASE) {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const url = new URL(`${base}${normalizedPath}`);
   Object.entries(query).forEach(([key, value]) => {
     if (value === undefined || value === null || value === "") return;
     url.searchParams.append(key, String(value));
@@ -11,7 +27,25 @@ function buildUrl(path, query = {}) {
 
 async function requestJson(path, options = {}, query = {}) {
   const url = buildUrl(path, query);
-  const response = await fetch(url, options);
+  let response;
+  try {
+    response = await fetch(url, options);
+  } catch {
+    const fallbackBase =
+      typeof window !== "undefined" && window.location?.origin
+        ? trimTrailingSlash(window.location.origin)
+        : null;
+    if (fallbackBase && fallbackBase !== API_BASE) {
+      try {
+        response = await fetch(buildUrl(path, query, fallbackBase), options);
+      } catch {
+        throw new Error("无法连接后端服务，请确认后端已启动（默认 http://localhost:8000）");
+      }
+    } else {
+      throw new Error("无法连接后端服务，请确认后端已启动（默认 http://localhost:8000）");
+    }
+  }
+
   if (!response.ok) {
     const raw = await response.text();
     if (!raw) {
