@@ -1042,6 +1042,317 @@ code {
   min-height: 56px;
 }
 
+.student-crop-section {
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  background: var(--surface-alt);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.student-crop-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.student-crop-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.student-crop-area {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+  width: 100%;
+  user-select: none;
+  cursor: crosshair;
+}
+
+.student-crop-area img {
+  display: block;
+  width: 100%;
+  max-height: 360px;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.student-crop-rect {
+  position: absolute;
+  border: 2px solid rgba(14, 116, 144, 0.95);
+  background: rgba(56, 189, 248, 0.2);
+  box-shadow: 0 0 0 9999px rgba(2, 6, 23, 0.25);
+  pointer-events: none;
+}
+
+.student-ocr-section {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-alt);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.student-ocr-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.student-ocr-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.student-ocr-mode-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.student-ocr-mode-tab {
+  border: 1px solid rgba(15, 118, 110, 0.35);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--accent-strong);
+  padding: 4px 10px;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.student-ocr-mode-tab.active {
+  background: rgba(15, 118, 110, 0.14);
+  box-shadow: 0 8px 18px rgba(15, 118, 110, 0.12);
+}
+
+.student-ocr-head h4 {
+  margin: 0;
+  font-size: 0.98rem;
+}
+
+.student-ocr-head p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.student-ocr-mode-hint {
+  margin-top: -2px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.student-ocr-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.student-ocr-item {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.student-ocr-item.active {
+  border-color: rgba(15, 118, 110, 0.5);
+  box-shadow: 0 8px 18px rgba(15, 118, 110, 0.12);
+}
+
+.student-ocr-item-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.student-ocr-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.student-ocr-text {
+  margin: 0;
+  color: var(--ink);
+  line-height: 1.45;
+}
+
+.student-ocr-image-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.student-ocr-image-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.student-ocr-image-label {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.student-ocr-image-wrap {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  padding: 6px;
+}
+
+.student-ocr-image-wrap.diagram {
+  background-color: #f5f7fb;
+  background-image:
+    linear-gradient(45deg, rgba(96, 165, 250, 0.14) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(96, 165, 250, 0.14) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(96, 165, 250, 0.14) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(96, 165, 250, 0.14) 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+
+.student-ocr-image-wrap img {
+  width: 100%;
+  max-height: 160px;
+  object-fit: contain;
+  display: block;
+}
+
+.student-element-editor {
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.student-element-editor-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.student-element-editor-head h4 {
+  margin: 0;
+  font-size: 0.96rem;
+}
+
+.student-element-editor-head p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  max-width: 620px;
+}
+
+.student-element-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.student-element-stage {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+  cursor: crosshair;
+  line-height: 0;
+}
+
+.student-element-stage img {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.student-element-box {
+  position: absolute;
+  border: 1px solid rgba(2, 132, 199, 0.8);
+  background: rgba(56, 189, 248, 0.08);
+  cursor: pointer;
+  padding: 0;
+}
+
+.student-element-box.marked {
+  border: 2px solid rgba(220, 38, 38, 0.92);
+  background: rgba(248, 113, 113, 0.24);
+}
+
+.student-element-draft {
+  position: absolute;
+  border: 2px dashed rgba(245, 158, 11, 0.95);
+  background: rgba(250, 204, 21, 0.18);
+  pointer-events: none;
+}
+
+.student-preview-section {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-alt);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.student-preview-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.student-preview-head h4 {
+  margin: 0;
+  font-size: 0.98rem;
+}
+
+.student-preview-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.student-preview-card {
+  background: #fff;
+}
+
+.student-preview-note {
+  margin-top: 6px;
+}
+
 .student-hidden-input {
   display: none;
 }
@@ -1219,6 +1530,14 @@ code {
   }
 
   .student-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .student-ocr-list {
+    grid-template-columns: 1fr;
+  }
+
+  .student-ocr-image-grid {
     grid-template-columns: 1fr;
   }
 

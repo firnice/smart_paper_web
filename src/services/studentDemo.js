@@ -1,6 +1,7 @@
 const DEMO_DB_KEY = "smart_paper_demo_db_v1";
 
 const DEFAULT_GRADE = "未设置";
+const DEFAULT_SUBJECTS = ["数学", "语文", "英语", "科学"];
 
 function nowIso() {
   return new Date().toISOString();
@@ -15,11 +16,197 @@ export function getDefaultSchoolTerm(dateLike) {
   return `${year}${season}`;
 }
 
+function toSvgDataUrl(svg) {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+function buildMathSetDiagramDataUrl() {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="420" viewBox="0 0 800 420">
+  <rect width="800" height="420" fill="#ffffff"/>
+  <text x="40" y="52" font-size="28" fill="#0f172a" font-family="Arial, sans-serif">Set Diagram (A, B)</text>
+  <rect x="110" y="84" width="580" height="280" rx="18" fill="#f8fafc" stroke="#94a3b8" stroke-width="3"/>
+  <circle cx="340" cy="224" r="110" fill="rgba(14,165,233,0.22)" stroke="#0284c7" stroke-width="3"/>
+  <circle cx="460" cy="224" r="110" fill="rgba(16,185,129,0.22)" stroke="#059669" stroke-width="3"/>
+  <text x="285" y="150" font-size="30" fill="#0369a1" font-family="Arial, sans-serif">A</text>
+  <text x="500" y="150" font-size="30" fill="#047857" font-family="Arial, sans-serif">B</text>
+  <text x="245" y="228" font-size="30" fill="#0f172a" font-family="Arial, sans-serif">1, 2</text>
+  <text x="385" y="228" font-size="30" fill="#0f172a" font-family="Arial, sans-serif">3, 4</text>
+  <text x="532" y="228" font-size="30" fill="#0f172a" font-family="Arial, sans-serif">5, 6</text>
+  <text x="132" y="116" font-size="20" fill="#334155" font-family="Arial, sans-serif">U = {1,2,3,4,5,6}</text>
+  </svg>`;
+  return toSvgDataUrl(svg);
+}
+
+function buildMathGeometryDiagramDataUrl() {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="420" viewBox="0 0 800 420">
+  <rect width="800" height="420" fill="#ffffff"/>
+  <text x="40" y="52" font-size="28" fill="#0f172a" font-family="Arial, sans-serif">Geometry Diagram (Triangle)</text>
+  <line x1="180" y1="320" x2="640" y2="320" stroke="#334155" stroke-width="4"/>
+  <line x1="220" y1="320" x2="460" y2="120" stroke="#2563eb" stroke-width="4"/>
+  <line x1="460" y1="120" x2="620" y2="320" stroke="#2563eb" stroke-width="4"/>
+  <line x1="460" y1="120" x2="460" y2="320" stroke="#f97316" stroke-width="3" stroke-dasharray="10 7"/>
+  <rect x="460" y="304" width="16" height="16" fill="#f8fafc" stroke="#f97316" stroke-width="2"/>
+  <text x="210" y="350" font-size="26" fill="#0f172a" font-family="Arial, sans-serif">A</text>
+  <text x="452" y="104" font-size="26" fill="#0f172a" font-family="Arial, sans-serif">B</text>
+  <text x="628" y="350" font-size="26" fill="#0f172a" font-family="Arial, sans-serif">C</text>
+  <text x="486" y="230" font-size="24" fill="#ea580c" font-family="Arial, sans-serif">h</text>
+  <text x="355" y="366" font-size="24" fill="#0f172a" font-family="Arial, sans-serif">base = 8</text>
+  </svg>`;
+  return toSvgDataUrl(svg);
+}
+
+const MATH_SET_IMAGE = buildMathSetDiagramDataUrl();
+const MATH_GEOMETRY_IMAGE = buildMathGeometryDiagramDataUrl();
+
+function createStarterWrongQuestions({
+  studentId,
+  startId,
+  createdAt,
+  grade,
+}) {
+  const baseDate = new Date(createdAt);
+  const year = Number.isNaN(baseDate.getTime()) ? new Date().getFullYear() : baseDate.getFullYear();
+  const springTerm = `${year}春学期`;
+  const fallTerm = `${year}秋学期`;
+  const studentGrade = grade || DEFAULT_GRADE;
+
+  return [
+    {
+      id: startId,
+      student_id: studentId,
+      title: "集合交集判断",
+      content: "已知 A={1,2,3,4}, B={3,4,5,6}，请写出 A∩B。",
+      subject: "数学",
+      term: springTerm,
+      grade: studentGrade,
+      category: "集合概念",
+      error_reason: "交集概念混淆",
+      status: "new",
+      difficulty: "medium",
+      review_count: 0,
+      last_result: null,
+      image_data: MATH_SET_IMAGE,
+      image_name: "math-set-diagram.svg",
+      created_at: createdAt,
+      updated_at: createdAt,
+    },
+    {
+      id: startId + 1,
+      student_id: studentId,
+      title: "三角形高与面积",
+      content: "根据图示，底边=8，高=h，写出面积表达式。",
+      subject: "数学",
+      term: fallTerm,
+      grade: studentGrade,
+      category: "几何图示",
+      error_reason: "公式套用错误",
+      status: "reviewing",
+      difficulty: "medium",
+      review_count: 1,
+      last_result: "incorrect",
+      image_data: MATH_GEOMETRY_IMAGE,
+      image_name: "math-geometry-diagram.svg",
+      created_at: createdAt,
+      updated_at: createdAt,
+    },
+    {
+      id: startId + 2,
+      student_id: studentId,
+      title: "看图写话",
+      content: "用 3 句话描述图中的春游场景。",
+      subject: "语文",
+      term: springTerm,
+      grade: studentGrade,
+      category: "表达不完整",
+      error_reason: "审题不清",
+      status: "new",
+      difficulty: "medium",
+      review_count: 0,
+      last_result: null,
+      image_data: null,
+      image_name: null,
+      created_at: createdAt,
+      updated_at: createdAt,
+    },
+    {
+      id: startId + 3,
+      student_id: studentId,
+      title: "时态选择",
+      content: "Yesterday I ___ to school by bus.",
+      subject: "英语",
+      term: fallTerm,
+      grade: studentGrade,
+      category: "语法错误",
+      error_reason: "规则混淆",
+      status: "mastered",
+      difficulty: "medium",
+      review_count: 3,
+      last_result: "correct",
+      image_data: null,
+      image_name: null,
+      created_at: createdAt,
+      updated_at: createdAt,
+    },
+    {
+      id: startId + 4,
+      student_id: studentId,
+      title: "植物蒸腾作用判断",
+      content: "实验中叶片套袋后出现水珠，现象说明了什么？",
+      subject: "科学",
+      term: springTerm,
+      grade: studentGrade,
+      category: "实验分析",
+      error_reason: "因果关系判断错误",
+      status: "new",
+      difficulty: "easy",
+      review_count: 0,
+      last_result: null,
+      image_data: null,
+      image_name: null,
+      created_at: createdAt,
+      updated_at: createdAt,
+    },
+  ];
+}
+
+function ensureStudentStarterQuestions(db, studentId, grade) {
+  const existing = (db.wrongQuestions || []).filter((item) => item.student_id === studentId);
+
+  const createdAt = nowIso();
+  const maxExistingId = (db.wrongQuestions || []).reduce((max, item) => Math.max(max, Number(item.id) || 0), 0);
+  const startId = Math.max(Number(db.nextWrongQuestionId) || 1, maxExistingId + 1);
+  const starters = createStarterWrongQuestions({
+    studentId,
+    startId,
+    createdAt,
+    grade: grade || DEFAULT_GRADE,
+  });
+
+  const toAdd = starters.filter((candidate) => {
+    return !existing.some((item) => {
+      if (candidate.image_name && item.image_name === candidate.image_name) return true;
+      return item.subject === candidate.subject && item.title === candidate.title;
+    });
+  });
+
+  if (!toAdd.length) return;
+
+  db.wrongQuestions = [...(db.wrongQuestions || []), ...toAdd];
+  const maxAddedId = toAdd.reduce((max, item) => Math.max(max, Number(item.id) || 0), startId);
+  db.nextWrongQuestionId = Math.max(Number(db.nextWrongQuestionId) || 1, maxAddedId + 1);
+}
+
 function createSeedData() {
   const createdAt = nowIso();
+  const wrongQuestions = createStarterWrongQuestions({
+    studentId: 1,
+    startId: 1,
+    createdAt,
+    grade: "二年级",
+  });
   return {
     nextStudentId: 2,
-    nextWrongQuestionId: 5,
+    nextWrongQuestionId: wrongQuestions.length + 1,
     nextPracticeId: 1,
     students: [
       {
@@ -32,84 +219,7 @@ function createSeedData() {
         created_at: createdAt,
       },
     ],
-    wrongQuestions: [
-      {
-        id: 1,
-        student_id: 1,
-        title: "竖式进位加法",
-        content: "38 + 27 = ?",
-        subject: "数学",
-        term: "2025春学期",
-        grade: "二年级",
-        category: "计算错误",
-        error_reason: "粗心抄错",
-        status: "reviewing",
-        difficulty: "easy",
-        review_count: 2,
-        last_result: "correct",
-        image_data: null,
-        image_name: null,
-        created_at: createdAt,
-        updated_at: createdAt,
-      },
-      {
-        id: 2,
-        student_id: 1,
-        title: "看图写话",
-        content: "用 3 句话描述图中的春游场景。",
-        subject: "语文",
-        term: "2025春学期",
-        grade: "二年级",
-        category: "表达不完整",
-        error_reason: "审题不清",
-        status: "new",
-        difficulty: "medium",
-        review_count: 0,
-        last_result: null,
-        image_data: null,
-        image_name: null,
-        created_at: createdAt,
-        updated_at: createdAt,
-      },
-      {
-        id: 3,
-        student_id: 1,
-        title: "乘法口诀应用",
-        content: "6 x 7 = ?",
-        subject: "数学",
-        term: "2025秋学期",
-        grade: "二年级",
-        category: "基础不牢",
-        error_reason: "口诀不熟",
-        status: "new",
-        difficulty: "easy",
-        review_count: 0,
-        last_result: null,
-        image_data: null,
-        image_name: null,
-        created_at: createdAt,
-        updated_at: createdAt,
-      },
-      {
-        id: 4,
-        student_id: 1,
-        title: "时态选择",
-        content: "Yesterday I ___ to school by bus.",
-        subject: "英语",
-        term: "2025秋学期",
-        grade: "二年级",
-        category: "语法错误",
-        error_reason: "规则混淆",
-        status: "mastered",
-        difficulty: "medium",
-        review_count: 3,
-        last_result: "correct",
-        image_data: null,
-        image_name: null,
-        created_at: createdAt,
-        updated_at: createdAt,
-      },
-    ],
+    wrongQuestions,
     practices: [],
   };
 }
@@ -137,11 +247,18 @@ function loadDb() {
 }
 
 function saveDb(db) {
-  localStorage.setItem(DEMO_DB_KEY, JSON.stringify(db));
+  try {
+    localStorage.setItem(DEMO_DB_KEY, JSON.stringify(db));
+  } catch (error) {
+    if (error?.name === "QuotaExceededError") {
+      throw new Error("本地存储空间不足，请压缩图片或重置演示数据后重试");
+    }
+    throw error;
+  }
 }
 
 function migrateDb(db) {
-  return {
+  const migrated = {
     ...db,
     wrongQuestions: (db.wrongQuestions || []).map((item) => ({
       ...item,
@@ -153,6 +270,11 @@ function migrateDb(db) {
       image_name: item.image_name || null,
     })),
   };
+  const students = migrated.students || [];
+  for (const student of students) {
+    ensureStudentStarterQuestions(migrated, student.id, student.grade);
+  }
+  return migrated;
 }
 
 function uniqueValues(list) {
@@ -248,6 +370,8 @@ export function demoStudentLogin(payload) {
     student.grade = grade;
   }
 
+  ensureStudentStarterQuestions(db, student.id, student.grade);
+
   saveDb(db);
 
   return {
@@ -337,6 +461,7 @@ export function getStudentDashboardData(studentId, filters = {}) {
     stats: computeStats(allStudentItems),
     items: sortQuestions(items),
     subject_options: uniqueValues(allStudentItems.map((item) => item.subject)),
+    default_subject_options: DEFAULT_SUBJECTS,
     term_options: uniqueValues(allStudentItems.map((item) => item.term)),
     category_options: uniqueValues(allStudentItems.map((item) => item.category)),
   };
