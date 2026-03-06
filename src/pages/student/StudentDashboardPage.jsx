@@ -797,7 +797,7 @@ export default function StudentDashboardPage() {
   const [ocrItems, setOcrItems] = useState([]);
   const [ocrError, setOcrError] = useState("");
   const [selectedOcrId, setSelectedOcrId] = useState(null);
-  const [diagramRenderMode, setDiagramRenderMode] = useState("original_crop");
+  const [diagramRenderMode, setDiagramRenderMode] = useState("llm_svg");
   const [diagramRequestKey, setDiagramRequestKey] = useState("");
   const [sourceImageSnapshot, setSourceImageSnapshot] = useState({ data: "", name: "" });
   const [elementEditor, setElementEditor] = useState(() => createElementEditorInitial());
@@ -1929,7 +1929,7 @@ export default function StudentDashboardPage() {
                 <div className="student-ocr-head">
                   <div>
                     <h4>题目识别结果（真实）</h4>
-                    <p>OCR 只先识别题目和基础截图，不会自动跑图示链路。每题可单独点 3 个按钮触发。</p>
+                    <p>OCR 只先识别题目和基础截图。图示链路当前仅保留 SVG 生成方案。</p>
                   </div>
                   <div className="student-ocr-head-actions">
                     <button
@@ -1943,7 +1943,7 @@ export default function StudentDashboardPage() {
                   </div>
                 </div>
                 <div className="student-ocr-mode-hint">
-                  当前预览模式：{currentDiagramModeMeta.label}。{currentDiagramModeMeta.hint}
+                  当前图示方案：{currentDiagramModeMeta.label}。{currentDiagramModeMeta.hint}
                 </div>
 
                 {ocrStatus === "loading" && <div className="workspace-alert">正在识别题目，请稍候...</div>}
@@ -1955,9 +1955,6 @@ export default function StudentDashboardPage() {
                 {ocrStatus === "success" && ocrItems.length > 0 && (
                   <div className="student-ocr-list">
                     {ocrItems.map((item) => {
-                      const originalSourcePreview = sourceImageSnapshot.data || item.questionImageUrl || item.diagramImageUrl || "";
-                      const isApplyingOriginalCrop = diagramRenderMode === "original_crop" && selectedOcrId === item.id;
-                      const isApplyingLlmCrop = diagramRequestKey === `${item.id}:llm_crop`;
                       const isApplyingSvg = diagramRequestKey === `${item.id}:llm_svg`;
                       return (
                         <article
@@ -1971,25 +1968,9 @@ export default function StudentDashboardPage() {
                                 type="button"
                                 className="btn-ghost btn-small"
                                 disabled={Boolean(diagramRequestKey)}
-                                onClick={() => onApplyOcrItem(item, false, "original_crop")}
-                              >
-                                {isApplyingOriginalCrop ? "已进入原图抠图" : "1. 原图抠图"}
-                              </button>
-                              <button
-                                type="button"
-                                className="btn-ghost btn-small"
-                                disabled={Boolean(diagramRequestKey)}
-                                onClick={() => onApplyOcrItem(item, false, "llm_crop")}
-                              >
-                                {isApplyingLlmCrop ? "识别中..." : "2. LLM识别抠图"}
-                              </button>
-                              <button
-                                type="button"
-                                className="btn-ghost btn-small"
-                                disabled={Boolean(diagramRequestKey)}
                                 onClick={() => onApplyOcrItem(item, false, "llm_svg")}
                               >
-                                {isApplyingSvg ? "生成中..." : "3. LLM生成SVG"}
+                                {isApplyingSvg ? "生成中..." : "生成SVG"}
                               </button>
                             </div>
                           </div>
@@ -2006,32 +1987,16 @@ export default function StudentDashboardPage() {
                               )}
                             </div>
                             <div className="student-ocr-image-slot">
-                              <span className="student-ocr-image-label">
-                                {diagramRenderMode === "original_crop"
-                                  ? "原图抠图基底"
-                                  : diagramRenderMode === "llm_crop"
-                                    ? "LLM识别抠图预览"
-                                    : "LLM生成SVG说明"}
-                              </span>
-                              {diagramRenderMode === "llm_crop" && isApplyingLlmCrop ? (
-                                <div className="workspace-alert">正在生成 LLM 识别抠图...</div>
-                              ) : diagramRenderMode === "llm_crop" && item.diagramLlmImageUrl ? (
-                                <div className="student-ocr-image-wrap diagram">
-                                  <img src={item.diagramLlmImageUrl} alt={`第${item.id}题图示抠图`} />
-                                </div>
-                              ) : diagramRenderMode === "llm_svg" && isApplyingSvg ? (
+                              <span className="student-ocr-image-label">LLM生成SVG预览</span>
+                              {diagramRenderMode === "llm_svg" && isApplyingSvg ? (
                                 <div className="workspace-alert">正在生成 SVG 图示...</div>
-                              ) : diagramRenderMode === "original_crop" && originalSourcePreview ? (
-                                <div className="student-ocr-image-wrap">
-                                  <img src={originalSourcePreview} alt={`第${item.id}题原图基底`} />
+                              ) : diagramRenderMode === "llm_svg" && item.diagramSvgUrl ? (
+                                <div className="student-ocr-image-wrap diagram">
+                                  <img src={item.diagramSvgUrl} alt={`第${item.id}题SVG图示`} />
                                 </div>
                               ) : (
                                 <div className="workspace-alert">
-                                  {diagramRenderMode === "llm_crop"
-                                    ? "该题尚未生成 LLM 图示抠图，点击“2. LLM识别抠图”后按需生成。"
-                                    : diagramRenderMode === "original_crop"
-                                      ? "当前没有可用原图基底，请先上传图片或重试识别。"
-                                      : "将基于该题识别文字生成新的 SVG 图示。"}
+                                  点击“生成SVG”后，将基于该题识别文字生成新的 SVG 图示。
                                 </div>
                               )}
                             </div>
