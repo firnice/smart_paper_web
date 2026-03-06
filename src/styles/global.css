@@ -853,11 +853,23 @@ code {
 
 .student-paper-source {
   position: relative;
+  width: fit-content;
+  max-width: 100%;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: #fff;
   overflow: hidden;
   user-select: none;
+  line-height: 0;
+}
+
+.student-paper-source-scroll {
+  max-height: 72vh;
+  overflow: auto;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 6px;
 }
 
 .student-paper-source.selectable {
@@ -866,9 +878,10 @@ code {
 
 .student-paper-source img {
   display: block;
-  width: 100%;
-  max-height: 420px;
-  object-fit: contain;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: none;
   pointer-events: none;
 }
 
@@ -879,6 +892,28 @@ code {
   gap: 8px;
   color: var(--muted);
   font-size: 0.86rem;
+}
+
+.student-photo-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.student-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.student-zoom-label {
+  min-width: 52px;
+  text-align: center;
+  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+  color: var(--ink);
 }
 
 .student-selection-meta {

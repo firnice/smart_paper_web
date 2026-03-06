@@ -51,6 +51,10 @@ const RECOGNITION_SCOPES = [
   },
 ];
 
+const PAPER_ZOOM_MIN = 0.5;
+const PAPER_ZOOM_MAX = 3;
+const PAPER_ZOOM_STEP = 0.25;
+
 const TERM_OPTIONS = Array.from(
   new Set([
     `${new Date().getFullYear() - 1}秋学期`,
@@ -119,24 +123,19 @@ async function dataUrlToFile(dataUrl, fileName = "selected-question.png") {
   return new File([blob], fileName, { type: blob.type || "image/png" });
 }
 
-async function cropDataUrlByRect(sourceDataUrl, displayedWidth, displayedHeight, rect, outputType = "image/png") {
+async function cropDataUrlBySourceRect(sourceDataUrl, rect, outputType = "image/png") {
   if (!sourceDataUrl) {
     throw new Error("缺少源图片");
-  }
-  if (!displayedWidth || !displayedHeight) {
-    throw new Error("图片尚未完成渲染");
   }
   if (!rect || rect.width < 1 || rect.height < 1) {
     throw new Error("请先框选有效区域");
   }
 
   const sourceImage = await loadImageFromDataUrl(sourceDataUrl);
-  const scaleX = sourceImage.width / displayedWidth;
-  const scaleY = sourceImage.height / displayedHeight;
-  const sx = Math.max(0, Math.round(rect.x * scaleX));
-  const sy = Math.max(0, Math.round(rect.y * scaleY));
-  const sw = Math.max(1, Math.round(rect.width * scaleX));
-  const sh = Math.max(1, Math.round(rect.height * scaleY));
+  const sx = Math.max(0, Math.round(rect.x));
+  const sy = Math.max(0, Math.round(rect.y));
+  const sw = Math.max(1, Math.round(rect.width));
+  const sh = Math.max(1, Math.round(rect.height));
 
   const canvas = document.createElement("canvas");
   canvas.width = sw;
@@ -840,6 +839,8 @@ export default function StudentDashboardPage() {
   const [composerMode, setComposerMode] = useState("camera");
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [originalImageData, setOriginalImageData] = useState("");
+  const [paperImageMetrics, setPaperImageMetrics] = useState({ width: 0, height: 0 });
+  const [paperZoom, setPaperZoom] = useState(1);
   const [recognitionScope, setRecognitionScope] = useState("manual_question");
   const [isSelectingPaper, setIsSelectingPaper] = useState(false);
   const [paperSelectionStart, setPaperSelectionStart] = useState(null);
@@ -876,6 +877,24 @@ export default function StudentDashboardPage() {
       || paperSelectionRect
     ),
   );
+  const paperZoomPercent = `${Math.round(paperZoom * 100)}%`;
+  const paperSelectionDisplayRect = (() => {
+    const imageEl = paperImageRef.current;
+    if (!paperSelectionRect || !imageEl || !paperImageMetrics.width || !paperImageMetrics.height) {
+      return null;
+    }
+
+    const displayWidth = imageEl.clientWidth;
+    const displayHeight = imageEl.clientHeight;
+    if (!displayWidth || !displayHeight) return null;
+
+    return {
+      x: (paperSelectionRect.x / paperImageMetrics.width) * displayWidth,
+      y: (paperSelectionRect.y / paperImageMetrics.height) * displayHeight,
+      width: (paperSelectionRect.width / paperImageMetrics.width) * displayWidth,
+      height: (paperSelectionRect.height / paperImageMetrics.height) * displayHeight,
+    };
+  })();
 
   const refresh = useCallback(() => {
     if (!studentId) return;
@@ -948,6 +967,17 @@ export default function StudentDashboardPage() {
     setPaperSelectionRect(null);
   };
 
+  const resetPaperViewport = () => {
+    setPaperImageMetrics({ width: 0, height: 0 });
+    setPaperZoom(1);
+    resetPaperSelection();
+  };
+
+  const updatePaperZoom = (nextZoom) => {
+    setPaperZoom(Math.max(PAPER_ZOOM_MIN, Math.min(PAPER_ZOOM_MAX, nextZoom)));
+    resetPaperSelection();
+  };
+
   const logout = () => {
     clearStudentSession();
     setSession(null);
@@ -964,13 +994,13 @@ export default function StudentDashboardPage() {
   const onOpenComposer = () => {
     setComposerMode("camera");
     setRecognitionScope("manual_question");
-    resetPaperSelection();
+    resetPaperViewport();
     resetElementEditor();
     setIsComposerOpen(true);
   };
 
   const onCloseComposer = () => {
-    resetPaperSelection();
+    resetPaperViewport();
     resetElementEditor();
     setIsComposerOpen(false);
   };
@@ -986,7 +1016,7 @@ export default function StudentDashboardPage() {
     setOriginalImageData("");
     setSourceImageSnapshot({ data: "", name: "" });
     setRecognitionScope("manual_question");
-    resetPaperSelection();
+    resetPaperViewport();
     setIsCropping(false);
     setCropStart(null);
     setCropRect(null);
@@ -1259,18 +1289,15 @@ export default function StudentDashboardPage() {
       };
     }
 
-    const imageEl = paperImageRef.current;
     if (!paperSelectionRect) {
       throw new Error("请先在卷面上框选一道题");
     }
-    if (!imageEl || !imageEl.clientWidth || !imageEl.clientHeight) {
+    if (!paperImageMetrics.width || !paperImageMetrics.height) {
       throw new Error("卷面预览尚未完成，请稍后再试");
     }
 
-    const croppedDataUrl = await cropDataUrlByRect(
+    const croppedDataUrl = await cropDataUrlBySourceRect(
       sourceImageSnapshot.data,
-      imageEl.clientWidth,
-      imageEl.clientHeight,
       paperSelectionRect,
     );
     const baseName = String(file.name || "paper").replace(/\.[^.]+$/, "");
@@ -1351,7 +1378,7 @@ export default function StudentDashboardPage() {
         setSelectedOcrId(null);
         setDiagramRequestKey("");
         resetElementEditor();
-        resetPaperSelection();
+        resetPaperViewport();
         setRecognitionScope("manual_question");
 
         try {
@@ -1461,7 +1488,7 @@ export default function StudentDashboardPage() {
       setSelectedOcrId(null);
       setDiagramRequestKey("");
       resetElementEditor();
-      resetPaperSelection();
+      resetPaperViewport();
       setRecognitionScope("manual_question");
       if (!keepSource) {
         setIsComposerOpen(false);
@@ -1512,17 +1539,37 @@ export default function StudentDashboardPage() {
     }
   };
 
-  const getPointInPaperImage = (event) => {
+  const getPaperImageDisplayMetrics = () => {
     const imageEl = paperImageRef.current;
-    if (!imageEl) return null;
+    if (!imageEl || !paperImageMetrics.width || !paperImageMetrics.height) return null;
 
     const rect = imageEl.getBoundingClientRect();
     if (!rect.width || !rect.height) return null;
 
+    return {
+      rect,
+      displayWidth: rect.width,
+      displayHeight: rect.height,
+      sourceWidth: paperImageMetrics.width,
+      sourceHeight: paperImageMetrics.height,
+    };
+  };
+
+  const getPointInPaperImage = (event) => {
+    const metrics = getPaperImageDisplayMetrics();
+    if (!metrics) return null;
+
+    const { rect, displayWidth, displayHeight, sourceWidth, sourceHeight } = metrics;
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
-    if (x < 0 || y < 0 || x > rect.width || y > rect.height) return null;
-    return { x, y, width: rect.width, height: rect.height };
+    if (x < 0 || y < 0 || x > displayWidth || y > displayHeight) return null;
+
+    return {
+      displayX: x,
+      displayY: y,
+      sourceX: Math.max(0, Math.min(sourceWidth, Math.round((x / displayWidth) * sourceWidth))),
+      sourceY: Math.max(0, Math.min(sourceHeight, Math.round((y / displayHeight) * sourceHeight))),
+    };
   };
 
   const onPaperMouseDown = (event) => {
@@ -1532,23 +1579,19 @@ export default function StudentDashboardPage() {
 
     event.preventDefault();
     setIsSelectingPaper(true);
-    setPaperSelectionStart({ x: point.x, y: point.y });
-    setPaperSelectionRect({ x: point.x, y: point.y, width: 0, height: 0 });
+    setPaperSelectionStart({ x: point.sourceX, y: point.sourceY });
+    setPaperSelectionRect({ x: point.sourceX, y: point.sourceY, width: 0, height: 0 });
   };
 
   const onPaperMouseMove = (event) => {
     if (!isSelectingPaper || !paperSelectionStart) return;
-    const imageEl = paperImageRef.current;
-    if (!imageEl) return;
+    const point = getPointInPaperImage(event);
+    if (!point) return;
 
-    const rect = imageEl.getBoundingClientRect();
-    const x = Math.max(0, Math.min(event.clientX - rect.left, rect.width));
-    const y = Math.max(0, Math.min(event.clientY - rect.top, rect.height));
-
-    const left = Math.min(paperSelectionStart.x, x);
-    const top = Math.min(paperSelectionStart.y, y);
-    const width = Math.abs(paperSelectionStart.x - x);
-    const height = Math.abs(paperSelectionStart.y - y);
+    const left = Math.min(paperSelectionStart.x, point.sourceX);
+    const top = Math.min(paperSelectionStart.y, point.sourceY);
+    const width = Math.abs(paperSelectionStart.x - point.sourceX);
+    const height = Math.abs(paperSelectionStart.y - point.sourceY);
     setPaperSelectionRect({ x: left, y: top, width, height });
   };
 
@@ -1559,7 +1602,7 @@ export default function StudentDashboardPage() {
 
     setPaperSelectionRect((prev) => {
       if (!prev) return null;
-      if (prev.width < 8 || prev.height < 8) return null;
+      if (prev.width < 12 || prev.height < 12) return null;
       return prev;
     });
   };
@@ -2117,34 +2160,82 @@ export default function StudentDashboardPage() {
             {(sourceImageSnapshot.data || sourceImageSnapshot.name) && (
               <div className="student-photo-preview student-full-col">
                 {sourceImageSnapshot.data ? (
-                  <div
-                    className={`student-paper-source ${recognitionScope === "manual_question" ? "selectable" : ""}`}
-                    onMouseDown={onPaperMouseDown}
-                    onMouseMove={onPaperMouseMove}
-                    onMouseUp={onPaperMouseUp}
-                    onMouseLeave={onPaperMouseUp}
-                  >
-                    <img ref={paperImageRef} src={sourceImageSnapshot.data} alt={sourceImageSnapshot.name || "试卷图片"} />
-                    {recognitionScope === "manual_question" && paperSelectionRect && (
-                      <div
-                        className="student-crop-rect"
+                  <div className="student-paper-source-scroll">
+                    <div
+                      className={`student-paper-source ${recognitionScope === "manual_question" ? "selectable" : ""}`}
+                      onMouseDown={onPaperMouseDown}
+                      onMouseMove={onPaperMouseMove}
+                      onMouseUp={onPaperMouseUp}
+                      onMouseLeave={onPaperMouseUp}
+                    >
+                      <img
+                        ref={paperImageRef}
+                        src={sourceImageSnapshot.data}
+                        alt={sourceImageSnapshot.name || "试卷图片"}
+                        onLoad={(event) => {
+                          const target = event.currentTarget;
+                          setPaperImageMetrics({
+                            width: target.naturalWidth || 0,
+                            height: target.naturalHeight || 0,
+                          });
+                        }}
                         style={{
-                          left: `${paperSelectionRect.x}px`,
-                          top: `${paperSelectionRect.y}px`,
-                          width: `${paperSelectionRect.width}px`,
-                          height: `${paperSelectionRect.height}px`,
+                          width: paperImageMetrics.width ? `${Math.round(paperImageMetrics.width * paperZoom)}px` : "auto",
+                          maxWidth: "none",
                         }}
                       />
-                    )}
+                      {recognitionScope === "manual_question" && paperSelectionDisplayRect && (
+                        <div
+                          className="student-crop-rect"
+                          style={{
+                            left: `${paperSelectionDisplayRect.x}px`,
+                            top: `${paperSelectionDisplayRect.y}px`,
+                            width: `${paperSelectionDisplayRect.width}px`,
+                            height: `${paperSelectionDisplayRect.height}px`,
+                          }}
+                        />
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <div className="workspace-alert">当前附件：{sourceImageSnapshot.name}</div>
                 )}
                 <div className="student-photo-meta">
                   <span>{sourceImageSnapshot.name || "已选择文件"}</span>
-                  <button type="button" className="btn-small btn-ghost" onClick={onRemovePhoto}>
-                    清除文件
-                  </button>
+                  <div className="student-photo-actions">
+                    {sourceImageSnapshot.data && (
+                      <div className="student-zoom-controls">
+                        <button
+                          type="button"
+                          className="btn-small btn-ghost"
+                          onClick={() => updatePaperZoom(paperZoom - PAPER_ZOOM_STEP)}
+                          disabled={paperZoom <= PAPER_ZOOM_MIN}
+                        >
+                          缩小
+                        </button>
+                        <span className="student-zoom-label">{paperZoomPercent}</span>
+                        <button
+                          type="button"
+                          className="btn-small btn-ghost"
+                          onClick={() => updatePaperZoom(1)}
+                          disabled={paperZoom === 1}
+                        >
+                          100%
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-small btn-ghost"
+                          onClick={() => updatePaperZoom(paperZoom + PAPER_ZOOM_STEP)}
+                          disabled={paperZoom >= PAPER_ZOOM_MAX}
+                        >
+                          放大
+                        </button>
+                      </div>
+                    )}
+                    <button type="button" className="btn-small btn-ghost" onClick={onRemovePhoto}>
+                      清除文件
+                    </button>
+                  </div>
                 </div>
                 <div className="student-selection-meta">
                   <div className="student-selection-tabs">
