@@ -38,6 +38,19 @@ const ENTRY_MODES = [
   { id: "text", label: "输入" },
 ];
 
+const RECOGNITION_SCOPES = [
+  {
+    id: "manual_question",
+    label: "手动截一道题",
+    hint: "先在整张卷子上拖拽框出一道题，再手动开始识别。",
+  },
+  {
+    id: "full_page",
+    label: "整张识别",
+    hint: "直接识别整页，适合先快速查看这张卷子的题目列表。",
+  },
+];
+
 const TERM_OPTIONS = Array.from(
   new Set([
     `${new Date().getFullYear() - 1}秋学期`,
@@ -98,6 +111,42 @@ function loadImageFromDataUrl(dataUrl) {
     image.onerror = () => reject(new Error("图片解析失败"));
     image.src = dataUrl;
   });
+}
+
+async function dataUrlToFile(dataUrl, fileName = "selected-question.png") {
+  const response = await fetch(dataUrl);
+  const blob = await response.blob();
+  return new File([blob], fileName, { type: blob.type || "image/png" });
+}
+
+async function cropDataUrlByRect(sourceDataUrl, displayedWidth, displayedHeight, rect, outputType = "image/png") {
+  if (!sourceDataUrl) {
+    throw new Error("缺少源图片");
+  }
+  if (!displayedWidth || !displayedHeight) {
+    throw new Error("图片尚未完成渲染");
+  }
+  if (!rect || rect.width < 1 || rect.height < 1) {
+    throw new Error("请先框选有效区域");
+  }
+
+  const sourceImage = await loadImageFromDataUrl(sourceDataUrl);
+  const scaleX = sourceImage.width / displayedWidth;
+  const scaleY = sourceImage.height / displayedHeight;
+  const sx = Math.max(0, Math.round(rect.x * scaleX));
+  const sy = Math.max(0, Math.round(rect.y * scaleY));
+  const sw = Math.max(1, Math.round(rect.width * scaleX));
+  const sh = Math.max(1, Math.round(rect.height * scaleY));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = sw;
+  canvas.height = sh;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("浏览器不支持图片裁剪");
+  }
+  context.drawImage(sourceImage, sx, sy, sw, sh, 0, 0, sw, sh);
+  return canvas.toDataURL(outputType);
 }
 
 function normalizeOcrImageUrl(url) {
@@ -769,6 +818,7 @@ export default function StudentDashboardPage() {
   const cameraInputRef = useRef(null);
   const photoInputRef = useRef(null);
   const uploadInputRef = useRef(null);
+  const paperImageRef = useRef(null);
   const cropImageRef = useRef(null);
   const elementStageRef = useRef(null);
   const latestImageFileRef = useRef(null);
@@ -790,6 +840,10 @@ export default function StudentDashboardPage() {
   const [composerMode, setComposerMode] = useState("camera");
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [originalImageData, setOriginalImageData] = useState("");
+  const [recognitionScope, setRecognitionScope] = useState("manual_question");
+  const [isSelectingPaper, setIsSelectingPaper] = useState(false);
+  const [paperSelectionStart, setPaperSelectionStart] = useState(null);
+  const [paperSelectionRect, setPaperSelectionRect] = useState(null);
   const [isCropping, setIsCropping] = useState(false);
   const [cropStart, setCropStart] = useState(null);
   const [cropRect, setCropRect] = useState(null);
@@ -810,8 +864,18 @@ export default function StudentDashboardPage() {
 
   const studentId = session?.student?.id;
   const isOriginalCropMode = diagramRenderMode === "original_crop";
+  const currentRecognitionScopeMeta =
+    RECOGNITION_SCOPES.find((scope) => scope.id === recognitionScope) || RECOGNITION_SCOPES[0];
   const currentDiagramModeMeta =
     DIAGRAM_RENDER_MODES.find((mode) => mode.id === diagramRenderMode) || DIAGRAM_RENDER_MODES[0];
+  const canRunRecognition = Boolean(
+    latestImageFileRef.current
+    && (
+      recognitionScope === "full_page"
+      || !sourceImageSnapshot.data
+      || paperSelectionRect
+    ),
+  );
 
   const refresh = useCallback(() => {
     if (!studentId) return;
@@ -878,6 +942,12 @@ export default function StudentDashboardPage() {
     setElementDraftRect(null);
   };
 
+  const resetPaperSelection = () => {
+    setIsSelectingPaper(false);
+    setPaperSelectionStart(null);
+    setPaperSelectionRect(null);
+  };
+
   const logout = () => {
     clearStudentSession();
     setSession(null);
@@ -893,11 +963,14 @@ export default function StudentDashboardPage() {
 
   const onOpenComposer = () => {
     setComposerMode("camera");
+    setRecognitionScope("manual_question");
+    resetPaperSelection();
     resetElementEditor();
     setIsComposerOpen(true);
   };
 
   const onCloseComposer = () => {
+    resetPaperSelection();
     resetElementEditor();
     setIsComposerOpen(false);
   };
@@ -912,6 +985,8 @@ export default function StudentDashboardPage() {
     setForm((prev) => ({ ...prev, image_data: "", image_name: "" }));
     setOriginalImageData("");
     setSourceImageSnapshot({ data: "", name: "" });
+    setRecognitionScope("manual_question");
+    resetPaperSelection();
     setIsCropping(false);
     setCropStart(null);
     setCropRect(null);
@@ -1022,10 +1097,10 @@ export default function StudentDashboardPage() {
       return true;
     }
 
-    const sourceImageData = sourceImageSnapshot.data || item.questionImageUrl || item.diagramImageUrl || "";
+    const sourceImageData = item.questionImageUrl || item.diagramImageUrl || sourceImageSnapshot.data || "";
     const sourceImageName =
-      sourceImageSnapshot.name
-      || (item.questionImageUrl ? `ocr-question-q${item.id}.png` : item.diagramImageUrl ? `ocr-diagram-q${item.id}.png` : "");
+      (item.questionImageUrl ? `ocr-question-q${item.id}.png` : item.diagramImageUrl ? `ocr-diagram-q${item.id}.png` : "")
+      || sourceImageSnapshot.name;
     setSelectedOcrId(item.id);
     setForm((prev) => ({
       ...prev,
@@ -1171,28 +1246,85 @@ export default function StudentDashboardPage() {
     }
   };
 
-  const onRunRealOcr = async (file) => {
-    if (!file || !String(file.type || "").startsWith("image/")) return;
+  const buildRecognitionTarget = async () => {
+    const file = latestImageFileRef.current;
+    if (!file || !String(file.type || "").startsWith("image/")) {
+      throw new Error("请先上传试卷图片");
+    }
+
+    if (recognitionScope === "full_page" || !sourceImageSnapshot.data) {
+      return {
+        file,
+        label: sourceImageSnapshot.data ? "整张试卷" : "整张图片",
+      };
+    }
+
+    const imageEl = paperImageRef.current;
+    if (!paperSelectionRect) {
+      throw new Error("请先在卷面上框选一道题");
+    }
+    if (!imageEl || !imageEl.clientWidth || !imageEl.clientHeight) {
+      throw new Error("卷面预览尚未完成，请稍后再试");
+    }
+
+    const croppedDataUrl = await cropDataUrlByRect(
+      sourceImageSnapshot.data,
+      imageEl.clientWidth,
+      imageEl.clientHeight,
+      paperSelectionRect,
+    );
+    const baseName = String(file.name || "paper").replace(/\.[^.]+$/, "");
+    const croppedFile = await dataUrlToFile(croppedDataUrl, `${baseName}-selection.png`);
+    return {
+      file: croppedFile,
+      label: "选中题目区域",
+    };
+  };
+
+  const onRunRealOcr = async () => {
+    let target;
+    try {
+      target = await buildRecognitionTarget();
+    } catch (err) {
+      setFailure(err?.message || "当前无法开始识别");
+      return;
+    }
 
     resetElementEditor();
     setOcrStatus("loading");
     setOcrError("");
     setOcrItems([]);
     setSelectedOcrId(null);
+    setDiagramRequestKey("");
+    setForm((prev) => ({
+      ...INITIAL_FORM,
+      subject: prev.subject,
+      term: prev.term,
+      category: prev.category,
+      error_reason: prev.error_reason,
+    }));
+    setOriginalImageData("");
+    setCropRect(null);
+    setIsCropping(false);
+    setCropStart(null);
 
     try {
-      const response = await extractQuestions(file);
+      const response = await extractQuestions(target.file);
       const items = normalizeOcrItems(response?.items);
       if (!items.length) {
         setOcrStatus("empty");
-        setSuccess("真实识别完成，但未提取到题目，请手动填写");
+        setSuccess(`${target.label}识别完成，但未提取到题目，请手动填写`);
         return;
       }
 
       setOcrItems(items);
       setOcrStatus("success");
-      applyOcrTextOnly(items[0]);
-      setSuccess(`真实识别完成：共 ${items.length} 题，已加载第 ${items[0].id} 题文字，图示按当前策略手动应用`);
+      if (items.length === 1) {
+        applyOcrTextOnly(items[0]);
+        setSuccess(`识别完成：${target.label}已提取 1 题，可继续生成 SVG 或手动调整后保存`);
+      } else {
+        setSuccess(`识别完成：${target.label}共提取 ${items.length} 题，请先载入要处理的一题`);
+      }
     } catch (err) {
       const message = err?.message || "题目识别失败";
       setOcrStatus("error");
@@ -1217,42 +1349,49 @@ export default function StudentDashboardPage() {
         setOcrItems([]);
         setOcrError("");
         setSelectedOcrId(null);
+        setDiagramRequestKey("");
         resetElementEditor();
+        resetPaperSelection();
+        setRecognitionScope("manual_question");
 
         try {
           const compressed = await compressImage(file);
           setForm((prev) => ({
-            ...prev,
-            image_data: compressed,
-            image_name: file.name,
-            content: prev.content || `已通过${sourceLabel}录入图片，待补充题干文字`,
+            ...INITIAL_FORM,
+            subject: prev.subject,
+            term: prev.term,
+            category: prev.category,
+            error_reason: prev.error_reason,
           }));
           setSourceImageSnapshot({ data: compressed, name: file.name });
-          setOriginalImageData(compressed);
-          setCropRect(null);
-          setIsCropping(false);
-          setCropStart(null);
-          setSuccess("图片已加载，正在进行真实题目识别...");
-          await onRunRealOcr(file);
-        } catch {
-          // 某些浏览器无法解码 HEIC/HEIF，降级为附件模式，避免阻塞错题录入。
-          setForm((prev) => ({
-            ...prev,
-            image_data: "",
-            image_name: file.name,
-            content: prev.content || `已通过${sourceLabel}录入附件：${file.name}，请补充题干文字`,
-          }));
-          setSourceImageSnapshot({ data: "", name: "" });
           setOriginalImageData("");
           setCropRect(null);
           setIsCropping(false);
           setCropStart(null);
+          setSuccess(`已通过${sourceLabel}载入试卷，请先框选一道题或切换为整张识别，再手动开始识别`);
+        } catch {
+          // 某些浏览器无法解码 HEIC/HEIF，降级为附件模式，避免阻塞错题录入。
+          setForm((prev) => ({
+            ...INITIAL_FORM,
+            subject: prev.subject,
+            term: prev.term,
+            category: prev.category,
+            error_reason: prev.error_reason,
+            image_data: "",
+            image_name: file.name,
+            content: "",
+          }));
+          setSourceImageSnapshot({ data: "", name: file.name });
+          setOriginalImageData("");
+          setCropRect(null);
+          setIsCropping(false);
+          setCropStart(null);
+          setRecognitionScope("full_page");
           if (isLikelyHeicFile(file)) {
-            setSuccess("HEIC 图片当前浏览器无法解析预览，已按附件录入。仍将尝试真实识别题目。");
+            setSuccess(`已通过${sourceLabel}载入 HEIC 图片，但当前浏览器无法预览，可直接点击“整张识别”手动开始识别。`);
           } else {
-            setSuccess("图片暂不支持预览，已按附件录入。仍将尝试真实识别题目。");
+            setSuccess(`已通过${sourceLabel}载入图片，但当前浏览器暂不支持预览，可直接点击“整张识别”手动开始识别。`);
           }
-          await onRunRealOcr(file);
         }
       } else {
         setForm((prev) => ({
@@ -1261,7 +1400,7 @@ export default function StudentDashboardPage() {
           image_name: file.name,
           content: prev.content || `已上传附件：${file.name}`,
         }));
-        setSourceImageSnapshot({ data: "", name: "" });
+        setSourceImageSnapshot({ data: "", name: file.name });
         setOriginalImageData("");
         setCropRect(null);
         setIsCropping(false);
@@ -1299,17 +1438,20 @@ export default function StudentDashboardPage() {
     event.target.value = "";
   };
 
-  const onAddWrongQuestion = (event) => {
-    event.preventDefault();
+  const persistWrongQuestion = (keepSource = false) => {
     if (!studentId) return;
 
     setLoading(true);
     try {
       createStudentWrongQuestion(studentId, form);
-      setForm((prev) => ({ ...INITIAL_FORM, subject: prev.subject, term: prev.term }));
-      setIsComposerOpen(false);
+      setForm((prev) => ({
+        ...INITIAL_FORM,
+        subject: prev.subject,
+        term: prev.term,
+        category: prev.category,
+        error_reason: prev.error_reason,
+      }));
       setOriginalImageData("");
-      setSourceImageSnapshot({ data: "", name: "" });
       setCropRect(null);
       setIsCropping(false);
       setCropStart(null);
@@ -1317,15 +1459,27 @@ export default function StudentDashboardPage() {
       setOcrItems([]);
       setOcrError("");
       setSelectedOcrId(null);
+      setDiagramRequestKey("");
       resetElementEditor();
-      latestImageFileRef.current = null;
+      resetPaperSelection();
+      setRecognitionScope("manual_question");
+      if (!keepSource) {
+        setIsComposerOpen(false);
+        setSourceImageSnapshot({ data: "", name: "" });
+        latestImageFileRef.current = null;
+      }
       refresh();
-      setSuccess("错题已加入错题本");
+      setSuccess(keepSource ? "错题已加入错题本，可继续框选下一题" : "错题已加入错题本");
     } catch (err) {
       setFailure(err?.message || "新增错题失败");
     } finally {
       setLoading(false);
     }
+  };
+
+  const onAddWrongQuestion = (event) => {
+    event.preventDefault();
+    persistWrongQuestion(false);
   };
 
   const onChangeStatus = (wrongQuestionId, status) => {
@@ -1356,6 +1510,58 @@ export default function StudentDashboardPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const getPointInPaperImage = (event) => {
+    const imageEl = paperImageRef.current;
+    if (!imageEl) return null;
+
+    const rect = imageEl.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    if (x < 0 || y < 0 || x > rect.width || y > rect.height) return null;
+    return { x, y, width: rect.width, height: rect.height };
+  };
+
+  const onPaperMouseDown = (event) => {
+    if (!sourceImageSnapshot.data || recognitionScope !== "manual_question") return;
+    const point = getPointInPaperImage(event);
+    if (!point) return;
+
+    event.preventDefault();
+    setIsSelectingPaper(true);
+    setPaperSelectionStart({ x: point.x, y: point.y });
+    setPaperSelectionRect({ x: point.x, y: point.y, width: 0, height: 0 });
+  };
+
+  const onPaperMouseMove = (event) => {
+    if (!isSelectingPaper || !paperSelectionStart) return;
+    const imageEl = paperImageRef.current;
+    if (!imageEl) return;
+
+    const rect = imageEl.getBoundingClientRect();
+    const x = Math.max(0, Math.min(event.clientX - rect.left, rect.width));
+    const y = Math.max(0, Math.min(event.clientY - rect.top, rect.height));
+
+    const left = Math.min(paperSelectionStart.x, x);
+    const top = Math.min(paperSelectionStart.y, y);
+    const width = Math.abs(paperSelectionStart.x - x);
+    const height = Math.abs(paperSelectionStart.y - y);
+    setPaperSelectionRect({ x: left, y: top, width, height });
+  };
+
+  const onPaperMouseUp = () => {
+    if (!isSelectingPaper) return;
+    setIsSelectingPaper(false);
+    setPaperSelectionStart(null);
+
+    setPaperSelectionRect((prev) => {
+      if (!prev) return null;
+      if (prev.width < 8 || prev.height < 8) return null;
+      return prev;
+    });
   };
 
   const getPointInImage = (event) => {
@@ -1908,42 +2114,100 @@ export default function StudentDashboardPage() {
               />
             </div>
 
-            {(form.image_data || form.image_name) && (
+            {(sourceImageSnapshot.data || sourceImageSnapshot.name) && (
               <div className="student-photo-preview student-full-col">
-                {form.image_data ? (
-                  <img src={form.image_data} alt={form.image_name || "错题图片"} />
+                {sourceImageSnapshot.data ? (
+                  <div
+                    className={`student-paper-source ${recognitionScope === "manual_question" ? "selectable" : ""}`}
+                    onMouseDown={onPaperMouseDown}
+                    onMouseMove={onPaperMouseMove}
+                    onMouseUp={onPaperMouseUp}
+                    onMouseLeave={onPaperMouseUp}
+                  >
+                    <img ref={paperImageRef} src={sourceImageSnapshot.data} alt={sourceImageSnapshot.name || "试卷图片"} />
+                    {recognitionScope === "manual_question" && paperSelectionRect && (
+                      <div
+                        className="student-crop-rect"
+                        style={{
+                          left: `${paperSelectionRect.x}px`,
+                          top: `${paperSelectionRect.y}px`,
+                          width: `${paperSelectionRect.width}px`,
+                          height: `${paperSelectionRect.height}px`,
+                        }}
+                      />
+                    )}
+                  </div>
                 ) : (
-                  <div className="workspace-alert">当前附件：{form.image_name}</div>
+                  <div className="workspace-alert">当前附件：{sourceImageSnapshot.name}</div>
                 )}
                 <div className="student-photo-meta">
-                  <span>{form.image_name || "已选择文件"}</span>
+                  <span>{sourceImageSnapshot.name || "已选择文件"}</span>
                   <button type="button" className="btn-small btn-ghost" onClick={onRemovePhoto}>
                     清除文件
                   </button>
                 </div>
+                <div className="student-selection-meta">
+                  <div className="student-selection-tabs">
+                    {RECOGNITION_SCOPES.map((scope) => (
+                      <button
+                        key={scope.id}
+                        type="button"
+                        className={`student-selection-tab ${recognitionScope === scope.id ? "active" : ""}`}
+                        onClick={() => {
+                          setRecognitionScope(scope.id);
+                          if (scope.id === "full_page") {
+                            resetPaperSelection();
+                          }
+                        }}
+                      >
+                        {scope.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="student-selection-hint">
+                    {currentRecognitionScopeMeta.hint}
+                    {recognitionScope === "manual_question" && !sourceImageSnapshot.data
+                      ? " 当前图片无法预览，请改用整张识别。"
+                      : ""}
+                  </p>
+                </div>
               </div>
             )}
 
-            {(form.image_data || form.image_name) && (
+            {(sourceImageSnapshot.data || sourceImageSnapshot.name) && (
               <section className="student-ocr-section">
                 <div className="student-ocr-head">
                   <div>
-                    <h4>题目识别结果（真实）</h4>
-                    <p>OCR 只先识别题目和基础截图。图示链路当前仅保留 SVG 生成方案。</p>
+                    <h4>整张卷子处理</h4>
+                    <p>现在改为手动触发：先选整张或框一道题，再开始识别；识别完成后按题生成 SVG 并确认保存。</p>
                   </div>
                   <div className="student-ocr-head-actions">
+                    {recognitionScope === "manual_question" && sourceImageSnapshot.data && (
+                      <button
+                        type="button"
+                        className="btn-ghost btn-small"
+                        disabled={!paperSelectionRect || ocrStatus === "loading"}
+                        onClick={resetPaperSelection}
+                      >
+                        清空选区
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="btn-secondary btn-small"
-                      disabled={ocrStatus === "loading" || !latestImageFileRef.current}
-                      onClick={() => onRunRealOcr(latestImageFileRef.current)}
+                      disabled={ocrStatus === "loading" || !canRunRecognition}
+                      onClick={onRunRealOcr}
                     >
-                      {ocrStatus === "loading" ? "识别中..." : "重新识别"}
+                      {ocrStatus === "loading"
+                        ? "识别中..."
+                        : recognitionScope === "full_page" || !sourceImageSnapshot.data
+                          ? "识别整张"
+                          : "识别选中区域"}
                     </button>
                   </div>
                 </div>
                 <div className="student-ocr-mode-hint">
-                  当前图示方案：{currentDiagramModeMeta.label}。{currentDiagramModeMeta.hint}
+                  当前识别范围：{currentRecognitionScopeMeta.label}。当前图示方案：{currentDiagramModeMeta.label}。{currentDiagramModeMeta.hint}
                 </div>
 
                 {ocrStatus === "loading" && <div className="workspace-alert">正在识别题目，请稍候...</div>}
@@ -1960,6 +2224,10 @@ export default function StudentDashboardPage() {
                         <article
                           key={item.id}
                           className={`student-ocr-item ${selectedOcrId === item.id ? "active" : ""}`}
+                          onClick={() => {
+                            applyOcrTextOnly(item);
+                            setSuccess(`已载入第 ${item.id} 题题干，可继续生成 SVG 或手动修正后保存`);
+                          }}
                         >
                           <div className="student-ocr-item-head">
                             <strong>第 {item.id} 题</strong>
@@ -1967,8 +2235,22 @@ export default function StudentDashboardPage() {
                               <button
                                 type="button"
                                 className="btn-ghost btn-small"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  applyOcrTextOnly(item);
+                                  setSuccess(`已载入第 ${item.id} 题题干，可继续生成 SVG`);
+                                }}
+                              >
+                                载入题目
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-ghost btn-small"
                                 disabled={Boolean(diagramRequestKey)}
-                                onClick={() => onApplyOcrItem(item, false, "llm_svg")}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  onApplyOcrItem(item, false, "llm_svg");
+                                }}
                               >
                                 {isApplyingSvg ? "生成中..." : "生成SVG"}
                               </button>
@@ -2247,9 +2529,19 @@ export default function StudentDashboardPage() {
                   onChange={(event) => setForm((prev) => ({ ...prev, content: event.target.value }))}
                 />
               </label>
-              <button className="btn-primary" type="submit" disabled={loading}>
-                保存到错题本
-              </button>
+              <div className="student-form-actions">
+                <button
+                  className="btn-secondary"
+                  type="button"
+                  disabled={loading || !sourceImageSnapshot.data}
+                  onClick={() => persistWrongQuestion(true)}
+                >
+                  保存并继续下一题
+                </button>
+                <button className="btn-primary" type="submit" disabled={loading}>
+                  保存到错题本
+                </button>
+              </div>
             </form>
           </section>
         </div>

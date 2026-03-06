@@ -851,6 +851,27 @@ code {
   background: #fff;
 }
 
+.student-paper-source {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+  user-select: none;
+}
+
+.student-paper-source.selectable {
+  cursor: crosshair;
+}
+
+.student-paper-source img {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+  pointer-events: none;
+}
+
 .student-photo-meta {
   display: flex;
   justify-content: space-between;
@@ -858,6 +879,40 @@ code {
   gap: 8px;
   color: var(--muted);
   font-size: 0.86rem;
+}
+
+.student-selection-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.student-selection-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.student-selection-tab {
+  border: 1px solid rgba(15, 118, 110, 0.35);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--accent-strong);
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.student-selection-tab.active {
+  background: rgba(15, 118, 110, 0.14);
+  box-shadow: 0 8px 18px rgba(15, 118, 110, 0.12);
+}
+
+.student-selection-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.5;
 }
 
 .student-question-item {
@@ -1172,6 +1227,7 @@ code {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  cursor: pointer;
 }
 
 .student-ocr-item.active {
@@ -1429,6 +1485,14 @@ code {
 
 .workspace-form button {
   grid-column: 1 / -1;
+}
+
+.student-form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .workspace-inline-form {
