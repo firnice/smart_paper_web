@@ -84,6 +84,26 @@ export async function extractQuestions(file) {
   });
 }
 
+export async function generateDiagramCrop(payload) {
+  return requestJson("/api/ocr/diagram/crop", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function generateDiagramSvg(payload) {
+  return requestJson("/api/ocr/diagram/svg", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function generateVariants(payload) {
   return requestJson("/api/variants/generate", {
     method: "POST",

@@ -8,7 +8,7 @@ import {
   resetStudentDemoData,
   setWrongQuestionStatus,
 } from "../../services/studentDemo.js";
-import { extractQuestions } from "../../services/api.js";
+import { extractQuestions, generateDiagramCrop, generateDiagramSvg } from "../../services/api.js";
 import { clearStudentSession, readStudentSession } from "../../utils/studentSession.js";
 
 const INITIAL_FORM = {
@@ -46,6 +46,24 @@ const TERM_OPTIONS = Array.from(
     `${new Date().getFullYear() + 1}春学期`,
   ]),
 );
+
+const DIAGRAM_RENDER_MODES = [
+  {
+    id: "original_crop",
+    label: "原图抠图",
+    hint: "使用上传原图进行手动/自动抠图后入卡片",
+  },
+  {
+    id: "llm_crop",
+    label: "LLM识别抠图",
+    hint: "直接使用识别返回的图示抠图",
+  },
+  {
+    id: "llm_svg",
+    label: "LLM生成SVG",
+    hint: "根据识别文字生成新的SVG替代图示",
+  },
+];
 
 function createElementEditorInitial() {
   return {
@@ -98,22 +116,72 @@ function normalizeOcrItems(rawItems) {
     .map((item, index) => {
       const questionImageUrl = normalizeOcrImageUrl(item?.question_image_url);
       const diagramImageUrl = normalizeOcrImageUrl(item?.diagram_image_url);
+      const diagramLocalImageUrl = normalizeOcrImageUrl(item?.diagram_local_image_url);
+      const diagramLlmImageUrl = normalizeOcrImageUrl(item?.diagram_llm_image_url);
+      const diagramSvgUrl = normalizeOcrImageUrl(item?.diagram_svg_url);
       const legacyImageUrls = Array.isArray(item?.image_urls)
         ? item.image_urls.map((url) => normalizeOcrImageUrl(url)).filter(Boolean)
         : [];
 
-      const resolvedDiagramImageUrl = diagramImageUrl || legacyImageUrls[0] || "";
       const resolvedQuestionImageUrl = questionImageUrl || "";
+      const resolvedLocalDiagramUrl = diagramLocalImageUrl || diagramImageUrl || legacyImageUrls[0] || "";
 
       return {
         id: Number(item?.id) || index + 1,
         text: String(item?.text || "").trim(),
-        hasImage: Boolean(item?.has_image) || Boolean(resolvedDiagramImageUrl),
+        hasImage: Boolean(item?.has_image) || Boolean(resolvedLocalDiagramUrl || diagramLlmImageUrl),
         questionImageUrl: resolvedQuestionImageUrl,
-        diagramImageUrl: resolvedDiagramImageUrl,
+        diagramImageUrl: resolvedLocalDiagramUrl,
+        diagramLocalImageUrl: resolvedLocalDiagramUrl,
+        diagramLlmImageUrl: diagramLlmImageUrl || "",
+        diagramSvgUrl,
       };
     })
-    .filter((item) => item.text || item.questionImageUrl || item.diagramImageUrl);
+    .filter((item) => item.text || item.questionImageUrl || item.diagramImageUrl || item.diagramSvgUrl);
+}
+
+function normalizeTextForCard(rawText) {
+  return String(rawText || "")
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join("\n");
+}
+
+function escapeSvgText(text) {
+  return String(text || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function buildDiagramReplacementDataUrl(rawText, questionId) {
+  const text = normalizeTextForCard(rawText);
+  const lines = text ? text.split("\n").slice(0, 4) : [];
+  const hint = lines.length ? lines : ["请根据题干补充图示关系", "可手动替换为标准教辅图"];
+  const escapedTitle = escapeSvgText(`第${questionId}题 图示替代草图`);
+  const textLines = hint
+    .map((line) => line.slice(0, 26))
+    .map((line, index) => `<text x="70" y="${122 + index * 34}" font-size="24" fill="#1f2937">${escapeSvgText(line)}</text>`)
+    .join("");
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="560" viewBox="0 0 960 560">
+<rect width="960" height="560" fill="#f8fafc"/>
+<rect x="36" y="34" width="888" height="492" rx="22" fill="#ffffff" stroke="#cbd5e1" stroke-width="3"/>
+<text x="70" y="84" font-size="30" fill="#0f172a">${escapedTitle}</text>
+<line x1="70" y1="102" x2="890" y2="102" stroke="#e2e8f0" stroke-width="2"/>
+<rect x="590" y="142" width="250" height="250" rx="18" fill="#eef2ff" stroke="#94a3b8" stroke-width="2"/>
+<circle cx="710" cy="214" r="62" fill="none" stroke="#3b82f6" stroke-width="4"/>
+<line x1="648" y1="214" x2="772" y2="214" stroke="#3b82f6" stroke-width="3"/>
+<line x1="710" y1="152" x2="710" y2="276" stroke="#3b82f6" stroke-width="3"/>
+<text x="648" y="332" font-size="20" fill="#475569">示意图模板</text>
+${textLines}
+<text x="70" y="474" font-size="20" fill="#64748b">注：此图为系统生成替代图，不依赖原图抠图结果。</text>
+</svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
 function isLikelyHeicFile(file) {
@@ -140,56 +208,6 @@ async function compressImage(file) {
 
   context.drawImage(image, 0, 0, width, height);
   return canvas.toDataURL("image/jpeg", 0.78);
-}
-
-function boxesOverlapExpanded(a, b, gapX, gapY) {
-  return !(
-    a.x + a.width + gapX < b.x ||
-    b.x + b.width + gapX < a.x ||
-    a.y + a.height + gapY < b.y ||
-    b.y + b.height + gapY < a.y
-  );
-}
-
-function mergeNearbyBoxes(rawBoxes, imageWidth, imageHeight) {
-  if (!rawBoxes.length) return [];
-
-  const gapX = Math.max(2, Math.round(imageWidth * 0.006));
-  const gapY = Math.max(2, Math.round(imageHeight * 0.008));
-  let merged = rawBoxes.map((box) => ({ ...box }));
-  let changed = true;
-
-  while (changed) {
-    changed = false;
-    const next = [];
-    for (const box of merged) {
-      let mergedInto = false;
-      for (const target of next) {
-        if (boxesOverlapExpanded(target, box, gapX, gapY)) {
-          const left = Math.min(target.x, box.x);
-          const top = Math.min(target.y, box.y);
-          const right = Math.max(target.x + target.width, box.x + box.width);
-          const bottom = Math.max(target.y + target.height, box.y + box.height);
-          target.x = left;
-          target.y = top;
-          target.width = right - left;
-          target.height = bottom - top;
-          target.area = target.width * target.height;
-          mergedInto = true;
-          changed = true;
-          break;
-        }
-      }
-      if (!mergedInto) next.push({ ...box });
-    }
-    merged = next;
-  }
-
-  const minArea = Math.max(50, Math.round(imageWidth * imageHeight * 0.00003));
-  const maxArea = Math.round(imageWidth * imageHeight * 0.88);
-  return merged
-    .filter((box) => box.area >= minArea && box.area <= maxArea)
-    .filter((box) => box.width >= 10 && box.height >= 10);
 }
 
 function buildTextRowMask(darkRowDensity, imageHeight) {
@@ -270,7 +288,7 @@ async function detectHandwritingElements(imageUrl) {
     const isRedMark = r >= 86 && r > g * 1.1 && r > b * 1.1 && sat >= 0.15;
     const isBlueMark = b >= 80 && b > r * 1.08 && b > g * 1.02 && sat >= 0.14;
     const isColorMark = isRedMark || isBlueMark;
-    const isDark = gray < 142;
+    const isDark = gray < 132;
 
     if (isDark) {
       darkRowCount[y] += 1;
@@ -292,6 +310,7 @@ async function detectHandwritingElements(imageUrl) {
     if (!candidateMask[idx] || visited[idx]) continue;
 
     const stack = [idx];
+    const pixels = [];
     visited[idx] = 1;
     let area = 0;
     let colorArea = 0;
@@ -306,6 +325,7 @@ async function detectHandwritingElements(imageUrl) {
       const y = Math.floor(current / width);
       const x = current % width;
       area += 1;
+      pixels.push(current);
       if (colorMask[current]) colorArea += 1;
       if (textRowMask[y]) textOverlap += 1;
       if (x < minX) minX = x;
@@ -366,10 +386,14 @@ async function detectHandwritingElements(imageUrl) {
       width: boxWidth,
       height: boxHeight,
       area: boxWidth * boxHeight,
+      density,
+      colorRatio,
+      textOverlapRatio,
+      pixelIndices: pixels,
     });
   }
 
-  const merged = mergeNearbyBoxes(rawBoxes, width, height)
+  const elements = rawBoxes
     .sort((a, b) => (a.y === b.y ? a.x - b.x : a.y - b.y))
     .slice(0, 120)
     .map((box, index) => ({ id: index + 1, ...box }));
@@ -377,7 +401,7 @@ async function detectHandwritingElements(imageUrl) {
   return {
     imageWidth: width,
     imageHeight: height,
-    elements: merged,
+    elements,
   };
 }
 
@@ -411,6 +435,7 @@ async function detectScanElements(imageUrl) {
   for (let idx = 0; idx < total; idx += 1) {
     if (!mask[idx] || visited[idx]) continue;
     const stack = [idx];
+    const pixels = [];
     visited[idx] = 1;
     let area = 0;
     let minX = width;
@@ -423,6 +448,7 @@ async function detectScanElements(imageUrl) {
       const y = Math.floor(current / width);
       const x = current % width;
       area += 1;
+      pixels.push(current);
       if (x < minX) minX = x;
       if (x > maxX) maxX = x;
       if (y < minY) minY = y;
@@ -454,16 +480,19 @@ async function detectScanElements(imageUrl) {
     if (area < minPixelArea) continue;
     const boxWidth = maxX - minX + 1;
     const boxHeight = maxY - minY + 1;
+    const density = area / Math.max(1, boxWidth * boxHeight);
     rawBoxes.push({
       x: minX,
       y: minY,
       width: boxWidth,
       height: boxHeight,
       area: boxWidth * boxHeight,
+      density,
+      pixelIndices: pixels,
     });
   }
 
-  const merged = mergeNearbyBoxes(rawBoxes, width, height)
+  const elements = rawBoxes
     .sort((a, b) => (a.y === b.y ? a.x - b.x : a.y - b.y))
     .slice(0, 120)
     .map((box, index) => ({ id: index + 1, ...box }));
@@ -471,11 +500,13 @@ async function detectScanElements(imageUrl) {
   return {
     imageWidth: width,
     imageHeight: height,
-    elements: merged,
+    elements,
   };
 }
 
-async function eraseSelectedElements(imageUrl, elements, hiddenIds) {
+async function eraseSelectedElements(imageUrl, elements, hiddenIds, options = {}) {
+  const mode = options.mode || "general";
+  const protectTextRows = Boolean(options.protectTextRows);
   const image = await loadImageFromDataUrl(imageUrl);
   const canvas = document.createElement("canvas");
   canvas.width = image.width;
@@ -486,10 +517,69 @@ async function eraseSelectedElements(imageUrl, elements, hiddenIds) {
   context.drawImage(image, 0, 0);
   const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
   const { data, width, height } = imageData;
+  const total = width * height;
+  const grayValues = new Uint8Array(total);
+  const colorMask = new Uint8Array(total);
+  const darkRowCount = new Uint32Array(height);
+  const eraseMask = new Uint8Array(total);
+  const protectedMask = new Uint8Array(total);
 
   const pixelIndex = (x, y) => (y * width + x) * 4;
+  const clampByte = (value) => Math.max(0, Math.min(255, Math.round(value)));
+
+  for (let i = 0, p = 0; i < total; i += 1, p += 4) {
+    const y = Math.floor(i / width);
+    const r = data[p];
+    const g = data[p + 1];
+    const b = data[p + 2];
+    const a = data[p + 3];
+    if (a <= 0) continue;
+
+    const gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+    grayValues[i] = gray;
+
+    const maxRgb = Math.max(r, g, b);
+    const minRgb = Math.min(r, g, b);
+    const sat = maxRgb > 0 ? (maxRgb - minRgb) / maxRgb : 0;
+    const isRedMark = r >= 86 && r > g * 1.1 && r > b * 1.1 && sat >= 0.15;
+    const isBlueMark = b >= 80 && b > r * 1.08 && b > g * 1.02 && sat >= 0.14;
+    if (isRedMark || isBlueMark) colorMask[i] = 1;
+    if (gray < 140) darkRowCount[y] += 1;
+  }
+
+  const darkRowDensity = Array.from(darkRowCount, (count) => count / Math.max(1, width));
+  const textRowMask = buildTextRowMask(darkRowDensity, height);
 
   const hiddenSet = new Set(hiddenIds);
+
+  const markErasablePixel = (idx, element, ringGray) => {
+    const gray = grayValues[idx];
+    const isColor = colorMask[idx] === 1;
+    const y = Math.floor(idx / width);
+    const aspect = element.width / Math.max(1, element.height);
+    const isStrokeLikeElement = (
+      aspect >= 4.2
+      || aspect <= 0.26
+      || element.width >= width * 0.1
+      || element.height >= height * 0.04
+    );
+
+    const isDarkInk = gray <= Math.max(128, ringGray - 20);
+    const isContrastInk = gray <= Math.max(160, ringGray - 14);
+    const isForeground = isColor || isDarkInk || (isContrastInk && ringGray >= 182);
+    if (!isForeground) return;
+
+    if (mode === "handwriting" && protectTextRows && textRowMask[y] && !isColor) {
+      const isStrongPenStroke = gray <= 88 && isStrokeLikeElement;
+      if (!isStrongPenStroke) {
+        protectedMask[idx] = 1;
+        return;
+      }
+    }
+
+    eraseMask[idx] = 1;
+  };
+
   for (const element of elements) {
     if (!hiddenSet.has(element.id)) continue;
     const padX = Math.max(2, Math.round(element.width * 0.06));
@@ -524,20 +614,154 @@ async function eraseSelectedElements(imageUrl, elements, hiddenIds) {
     const baseR = count ? Math.round(sumR / count) : 248;
     const baseG = count ? Math.round(sumG / count) : 248;
     const baseB = count ? Math.round(sumB / count) : 248;
+    const ringGray = Math.round((baseR + baseG + baseB) / 3);
+
+    if (Array.isArray(element.pixelIndices) && element.pixelIndices.length) {
+      for (const pixel of element.pixelIndices) {
+        if (pixel < 0 || pixel >= total) continue;
+        const py = Math.floor(pixel / width);
+        const px = pixel % width;
+        if (px < x || px >= x + w || py < y || py >= y + h) continue;
+        markErasablePixel(pixel, element, ringGray);
+      }
+      continue;
+    }
 
     for (let py = y; py < y + h; py += 1) {
       for (let px = x; px < x + w; px += 1) {
-        const idx = pixelIndex(px, py);
-        const noise = ((px * 17 + py * 31) % 7) - 3;
-        data[idx] = Math.max(0, Math.min(255, baseR + noise));
-        data[idx + 1] = Math.max(0, Math.min(255, baseG + noise));
-        data[idx + 2] = Math.max(0, Math.min(255, baseB + noise));
+        const idx = py * width + px;
+        markErasablePixel(idx, element, ringGray);
       }
     }
   }
 
+  let totalTextInk = 0;
+  let erasedTextInk = 0;
+  let protectedPixels = 0;
+  let erasedCandidates = 0;
+  for (let idx = 0; idx < total; idx += 1) {
+    const y = Math.floor(idx / width);
+    const gray = grayValues[idx];
+    if (protectTextRows && protectedMask[idx]) {
+      protectedPixels += 1;
+      eraseMask[idx] = 0;
+    }
+    const isPrintedInkPixel = textRowMask[y] && !colorMask[idx] && gray < 170;
+    if (isPrintedInkPixel) {
+      totalTextInk += 1;
+      if (eraseMask[idx]) erasedTextInk += 1;
+    }
+    if (eraseMask[idx]) erasedCandidates += 1;
+  }
+
+  if (mode === "handwriting" && totalTextInk > 0) {
+    const riskyRatio = erasedTextInk / totalTextInk;
+    if (riskyRatio > 0.08) {
+      throw new Error("自动去手写触发保护：疑似会误删题干，请改用“背景置白 + 手动框选”");
+    }
+  }
+
+  if (!erasedCandidates) {
+    return {
+      dataUrl: imageUrl,
+      removedPixels: 0,
+      protectedPixels,
+    };
+  }
+
+  const visited = new Uint8Array(total);
+  let removedPixels = 0;
+  for (let idx = 0; idx < total; idx += 1) {
+    if (!eraseMask[idx] || visited[idx]) continue;
+
+    const stack = [idx];
+    const pixels = [];
+    visited[idx] = 1;
+    let minX = width;
+    let maxX = 0;
+    let minY = height;
+    let maxY = 0;
+
+    while (stack.length) {
+      const current = stack.pop();
+      const y = Math.floor(current / width);
+      const x = current % width;
+      pixels.push(current);
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+
+      const left = x > 0 ? current - 1 : -1;
+      const right = x + 1 < width ? current + 1 : -1;
+      const up = y > 0 ? current - width : -1;
+      const down = y + 1 < height ? current + width : -1;
+      if (left >= 0 && eraseMask[left] && !visited[left]) {
+        visited[left] = 1;
+        stack.push(left);
+      }
+      if (right >= 0 && eraseMask[right] && !visited[right]) {
+        visited[right] = 1;
+        stack.push(right);
+      }
+      if (up >= 0 && eraseMask[up] && !visited[up]) {
+        visited[up] = 1;
+        stack.push(up);
+      }
+      if (down >= 0 && eraseMask[down] && !visited[down]) {
+        visited[down] = 1;
+        stack.push(down);
+      }
+    }
+
+    const ringGap = Math.max(1, Math.round(Math.min(maxX - minX + 1, maxY - minY + 1) * 0.08));
+    const ringLeft = Math.max(0, minX - ringGap);
+    const ringTop = Math.max(0, minY - ringGap);
+    const ringRight = Math.min(width - 1, maxX + ringGap);
+    const ringBottom = Math.min(height - 1, maxY + ringGap);
+
+    let sumR = 0;
+    let sumG = 0;
+    let sumB = 0;
+    let count = 0;
+    for (let py = ringTop; py <= ringBottom; py += 1) {
+      for (let px = ringLeft; px <= ringRight; px += 1) {
+        const pixel = py * width + px;
+        if (eraseMask[pixel]) continue;
+        const p = pixel * 4;
+        sumR += data[p];
+        sumG += data[p + 1];
+        sumB += data[p + 2];
+        count += 1;
+      }
+    }
+
+    const baseR = count ? Math.round(sumR / count) : 248;
+    const baseG = count ? Math.round(sumG / count) : 248;
+    const baseB = count ? Math.round(sumB / count) : 248;
+    const targetR = Math.max(baseR, 232);
+    const targetG = Math.max(baseG, 232);
+    const targetB = Math.max(baseB, 232);
+
+    for (const pixel of pixels) {
+      const p = pixel * 4;
+      const py = Math.floor(pixel / width);
+      const px = pixel % width;
+      const noise = ((px * 17 + py * 31) % 7) - 3;
+      data[p] = clampByte(targetR + noise);
+      data[p + 1] = clampByte(targetG + noise);
+      data[p + 2] = clampByte(targetB + noise);
+      data[p + 3] = 255;
+      removedPixels += 1;
+    }
+  }
+
   context.putImageData(imageData, 0, 0);
-  return canvas.toDataURL("image/png");
+  return {
+    dataUrl: canvas.toDataURL("image/png"),
+    removedPixels,
+    protectedPixels,
+  };
 }
 
 export default function StudentDashboardPage() {
@@ -573,7 +797,9 @@ export default function StudentDashboardPage() {
   const [ocrItems, setOcrItems] = useState([]);
   const [ocrError, setOcrError] = useState("");
   const [selectedOcrId, setSelectedOcrId] = useState(null);
-  const [ocrApplyMode, setOcrApplyMode] = useState("snapshot");
+  const [diagramRenderMode, setDiagramRenderMode] = useState("original_crop");
+  const [diagramRequestKey, setDiagramRequestKey] = useState("");
+  const [sourceImageSnapshot, setSourceImageSnapshot] = useState({ data: "", name: "" });
   const [elementEditor, setElementEditor] = useState(() => createElementEditorInitial());
   const [elementDraftStart, setElementDraftStart] = useState(null);
   const [elementDraftRect, setElementDraftRect] = useState(null);
@@ -583,6 +809,9 @@ export default function StudentDashboardPage() {
   const [error, setError] = useState("");
 
   const studentId = session?.student?.id;
+  const isOriginalCropMode = diagramRenderMode === "original_crop";
+  const currentDiagramModeMeta =
+    DIAGRAM_RENDER_MODES.find((mode) => mode.id === diagramRenderMode) || DIAGRAM_RENDER_MODES[0];
 
   const refresh = useCallback(() => {
     if (!studentId) return;
@@ -609,6 +838,38 @@ export default function StudentDashboardPage() {
   const setFailure = (message) => {
     setNotice("");
     setError(message);
+  };
+
+  const patchOcrItem = (itemId, patch) => {
+    setOcrItems((prev) =>
+      prev.map((entry) => {
+        if (entry.id !== itemId) return entry;
+        const merged = { ...entry, ...patch };
+        return {
+          ...merged,
+          hasImage: Boolean(
+            merged.hasImage
+            || merged.questionImageUrl
+            || merged.diagramImageUrl
+            || merged.diagramLocalImageUrl
+            || merged.diagramLlmImageUrl
+            || merged.diagramSvgUrl,
+          ),
+        };
+      }),
+    );
+  };
+
+  const applyOcrTextOnly = (item) => {
+    if (!item) return;
+    const normalizedText = normalizeTextForCard(item.text);
+    const baseTitle = `第${item.id}题`;
+    setSelectedOcrId(item.id);
+    setForm((prev) => ({
+      ...prev,
+      title: prev.title || baseTitle,
+      content: normalizedText || prev.content,
+    }));
   };
 
   const resetElementEditor = () => {
@@ -650,6 +911,7 @@ export default function StudentDashboardPage() {
   const onRemovePhoto = () => {
     setForm((prev) => ({ ...prev, image_data: "", image_name: "" }));
     setOriginalImageData("");
+    setSourceImageSnapshot({ data: "", name: "" });
     setIsCropping(false);
     setCropStart(null);
     setCropRect(null);
@@ -657,92 +919,127 @@ export default function StudentDashboardPage() {
     setOcrItems([]);
     setOcrError("");
     setSelectedOcrId(null);
-    setOcrApplyMode("snapshot");
     resetElementEditor();
     latestImageFileRef.current = null;
   };
 
-  const onApplyOcrItem = (item, silent = false, mode = ocrApplyMode) => {
-    if (!item) return;
-    const preferDiagram = mode === "diagram";
-    const chosenImageUrl = preferDiagram
-      ? item.diagramImageUrl || ""
-      : item.questionImageUrl || item.diagramImageUrl || "";
-    if (preferDiagram && !chosenImageUrl) {
-      if (!silent) {
-        setFailure(`第 ${item.id} 题没有可用图示图，请切到“题干+图片”模式`);
-      }
-      return;
-    }
-    const imageName = chosenImageUrl
-      ? preferDiagram
-        ? `ocr-diagram-q${item.id}.png`
-        : `ocr-question-q${item.id}.png`
-      : "";
+  const onApplyOcrItem = async (item, silent = false, mode = diagramRenderMode) => {
+    if (!item) return false;
+    let resolvedItem = item;
+    const normalizedText = normalizeTextForCard(item.text);
+    const baseTitle = `第${item.id}题`;
 
+    setDiagramRenderMode(mode);
+    setCropRect(null);
+    setIsCropping(false);
+    setCropStart(null);
+
+    if (mode === "llm_svg") {
+      if (!resolvedItem.diagramSvgUrl) {
+        setDiagramRequestKey(`${item.id}:${mode}`);
+        try {
+          const response = await generateDiagramSvg({
+            item_id: item.id,
+            question_text: item.text || "",
+            question_image_url: item.questionImageUrl || "",
+            diagram_image_url: item.diagramLocalImageUrl || item.diagramImageUrl || "",
+          });
+          const diagramSvgUrl = normalizeOcrImageUrl(response?.diagram_svg_url);
+          if (diagramSvgUrl) {
+            resolvedItem = { ...resolvedItem, diagramSvgUrl };
+            patchOcrItem(item.id, { diagramSvgUrl });
+          }
+        } catch (err) {
+          console.error("generateDiagramSvg failed", err);
+        } finally {
+          setDiagramRequestKey("");
+        }
+      }
+
+      const imageDataUrl = resolvedItem.diagramSvgUrl || buildDiagramReplacementDataUrl(item.text, item.id);
+      setSelectedOcrId(resolvedItem.id);
+      setForm((prev) => ({
+        ...prev,
+        title: prev.title || baseTitle,
+        content: normalizedText || prev.content,
+        image_data: imageDataUrl,
+        image_name: resolvedItem.diagramSvgUrl ? `llm-diagram-q${item.id}.svg` : `generated-diagram-q${item.id}.svg`,
+      }));
+      setOriginalImageData(imageDataUrl);
+      if (!silent) {
+        setSuccess(
+          resolvedItem.diagramSvgUrl
+            ? `已应用第 ${item.id} 题：使用后端 LLM 生成 SVG 图示`
+            : `已应用第 ${item.id} 题：使用本地模板生成 SVG 图示（后端未返回SVG）`,
+        );
+      }
+      return true;
+    }
+
+    if (mode === "llm_crop") {
+      if (!resolvedItem.diagramLlmImageUrl) {
+        setDiagramRequestKey(`${item.id}:${mode}`);
+        try {
+          const response = await generateDiagramCrop({
+            item_id: item.id,
+            question_text: item.text || "",
+            question_image_url: item.questionImageUrl || "",
+          });
+          const diagramLlmImageUrl = normalizeOcrImageUrl(response?.diagram_llm_image_url);
+          if (diagramLlmImageUrl) {
+            resolvedItem = { ...resolvedItem, diagramLlmImageUrl };
+            patchOcrItem(item.id, { diagramLlmImageUrl });
+          }
+        } catch (err) {
+          if (!silent) {
+            setFailure(err?.message || `第 ${item.id} 题图示抠图生成失败`);
+          }
+          return false;
+        } finally {
+          setDiagramRequestKey("");
+        }
+      }
+
+      const llmCropUrl = resolvedItem.diagramLlmImageUrl;
+      if (!llmCropUrl) {
+        if (!silent) {
+          setFailure(`第 ${item.id} 题没有可用图示抠图，请切换到“原图抠图”或“LLM生成SVG”`);
+        }
+        return false;
+      }
+      setSelectedOcrId(resolvedItem.id);
+      setForm((prev) => ({
+        ...prev,
+        title: prev.title || baseTitle,
+        content: normalizedText || prev.content,
+        image_data: llmCropUrl,
+        image_name: `ocr-diagram-q${item.id}.png`,
+      }));
+      setOriginalImageData(llmCropUrl);
+      if (!silent) {
+        setSuccess(`已应用第 ${item.id} 题：使用 LLM 识别抠图`);
+      }
+      return true;
+    }
+
+    const sourceImageData = sourceImageSnapshot.data || item.questionImageUrl || item.diagramImageUrl || "";
+    const sourceImageName =
+      sourceImageSnapshot.name
+      || (item.questionImageUrl ? `ocr-question-q${item.id}.png` : item.diagramImageUrl ? `ocr-diagram-q${item.id}.png` : "");
     setSelectedOcrId(item.id);
     setForm((prev) => ({
       ...prev,
-      title: prev.title || `第${item.id}题`,
-      content: preferDiagram ? prev.content || item.text || "" : item.text || prev.content,
-      image_data: chosenImageUrl || prev.image_data,
-      image_name: chosenImageUrl ? imageName : prev.image_name,
+      title: prev.title || baseTitle,
+      content: normalizedText || prev.content,
+      image_data: sourceImageData || prev.image_data,
+      image_name: sourceImageName || prev.image_name,
     }));
-
-    if (chosenImageUrl) {
-      setOriginalImageData(chosenImageUrl);
-      setCropRect(null);
-      setIsCropping(false);
-      setCropStart(null);
-    }
+    setOriginalImageData(sourceImageData || "");
 
     if (!silent) {
-      setSuccess(
-        preferDiagram
-          ? `已应用第 ${item.id} 题：仅替换为图示图（不强制覆盖当前题干）`
-          : `已应用第 ${item.id} 题：题干+图片已填充`,
-      );
+      setSuccess(`已应用第 ${item.id} 题：进入原图抠图模式（可继续精修）`);
     }
-  };
-
-  const onOpenOcrItemEditor = (item) => {
-    if (!item) return;
-
-    if (ocrApplyMode === "diagram") {
-      if (!item.diagramImageUrl) {
-        setFailure(`第 ${item.id} 题没有图示图，无法按“只换图示”模式精修`);
-        return;
-      }
-      onOpenElementEditor({
-        imageUrl: item.diagramImageUrl,
-        sourceLabel: `第${item.id}题图示图`,
-        sourceType: "diagram",
-        itemId: item.id,
-      });
-      return;
-    }
-
-    if (item.questionImageUrl) {
-      onOpenElementEditor({
-        imageUrl: item.questionImageUrl,
-        sourceLabel: `第${item.id}题题目图`,
-        sourceType: "question",
-        itemId: item.id,
-      });
-      return;
-    }
-
-    if (item.diagramImageUrl) {
-      onOpenElementEditor({
-        imageUrl: item.diagramImageUrl,
-        sourceLabel: `第${item.id}题图示图`,
-        sourceType: "diagram",
-        itemId: item.id,
-      });
-      return;
-    }
-
-    setFailure(`第 ${item.id} 题没有可精修图片`);
+    return true;
   };
 
   const onOpenElementEditor = async ({ imageUrl, sourceLabel, sourceType = "form", itemId = null }) => {
@@ -830,11 +1127,12 @@ export default function StudentDashboardPage() {
 
     setElementEditor((prev) => ({ ...prev, loading: true, error: "" }));
     try {
-      const cleaned = await eraseSelectedElements(
+      const erased = await eraseSelectedElements(
         elementEditor.sourceImage,
         elementEditor.elements,
         elementEditor.hiddenIds,
       );
+      const cleaned = erased.dataUrl;
       setForm((prev) => ({
         ...prev,
         image_data: cleaned,
@@ -862,7 +1160,11 @@ export default function StudentDashboardPage() {
       }
 
       resetElementEditor();
-      setSuccess(`已删除 ${elementEditor.hiddenIds.length} 个元素，生成清洗图`);
+      setSuccess(
+        erased.removedPixels > 0
+          ? `已删除 ${elementEditor.hiddenIds.length} 个元素，擦除 ${erased.removedPixels} 个像素`
+          : "已执行删除，但当前区域未检测到可擦除内容",
+      );
     } catch (err) {
       setElementEditor((prev) => ({ ...prev, loading: false, error: err?.message || "应用删除失败" }));
       setFailure(err?.message || "应用删除失败");
@@ -889,8 +1191,8 @@ export default function StudentDashboardPage() {
 
       setOcrItems(items);
       setOcrStatus("success");
-      onApplyOcrItem(items[0], true, ocrApplyMode);
-      setSuccess(`真实识别完成：共 ${items.length} 题，已自动填充第 ${items[0].id} 题`);
+      applyOcrTextOnly(items[0]);
+      setSuccess(`真实识别完成：共 ${items.length} 题，已加载第 ${items[0].id} 题文字，图示按当前策略手动应用`);
     } catch (err) {
       const message = err?.message || "题目识别失败";
       setOcrStatus("error");
@@ -915,7 +1217,6 @@ export default function StudentDashboardPage() {
         setOcrItems([]);
         setOcrError("");
         setSelectedOcrId(null);
-        setOcrApplyMode("snapshot");
         resetElementEditor();
 
         try {
@@ -926,6 +1227,7 @@ export default function StudentDashboardPage() {
             image_name: file.name,
             content: prev.content || `已通过${sourceLabel}录入图片，待补充题干文字`,
           }));
+          setSourceImageSnapshot({ data: compressed, name: file.name });
           setOriginalImageData(compressed);
           setCropRect(null);
           setIsCropping(false);
@@ -940,6 +1242,7 @@ export default function StudentDashboardPage() {
             image_name: file.name,
             content: prev.content || `已通过${sourceLabel}录入附件：${file.name}，请补充题干文字`,
           }));
+          setSourceImageSnapshot({ data: "", name: "" });
           setOriginalImageData("");
           setCropRect(null);
           setIsCropping(false);
@@ -958,6 +1261,7 @@ export default function StudentDashboardPage() {
           image_name: file.name,
           content: prev.content || `已上传附件：${file.name}`,
         }));
+        setSourceImageSnapshot({ data: "", name: "" });
         setOriginalImageData("");
         setCropRect(null);
         setIsCropping(false);
@@ -966,7 +1270,6 @@ export default function StudentDashboardPage() {
         setOcrItems([]);
         setOcrError("");
         setSelectedOcrId(null);
-        setOcrApplyMode("snapshot");
         resetElementEditor();
         latestImageFileRef.current = null;
         setSuccess("附件已加载，请补充题干后保存");
@@ -1006,6 +1309,7 @@ export default function StudentDashboardPage() {
       setForm((prev) => ({ ...INITIAL_FORM, subject: prev.subject, term: prev.term }));
       setIsComposerOpen(false);
       setOriginalImageData("");
+      setSourceImageSnapshot({ data: "", name: "" });
       setCropRect(null);
       setIsCropping(false);
       setCropStart(null);
@@ -1013,7 +1317,6 @@ export default function StudentDashboardPage() {
       setOcrItems([]);
       setOcrError("");
       setSelectedOcrId(null);
-      setOcrApplyMode("snapshot");
       resetElementEditor();
       latestImageFileRef.current = null;
       refresh();
@@ -1306,7 +1609,16 @@ export default function StudentDashboardPage() {
       }
 
       const allIds = detected.elements.map((item) => item.id);
-      const cleaned = await eraseSelectedElements(form.image_data, detected.elements, allIds);
+      const erased = await eraseSelectedElements(form.image_data, detected.elements, allIds, {
+        mode: "handwriting",
+        protectTextRows: true,
+      });
+      if (!erased.removedPixels) {
+        setSuccess("自动去手写未找到可安全擦除像素，已保留原图，请改用手动框选精修");
+        return;
+      }
+
+      const cleaned = erased.dataUrl;
       setOriginalImageData((prev) => prev || form.image_data);
       setForm((prev) => ({
         ...prev,
@@ -1314,7 +1626,9 @@ export default function StudentDashboardPage() {
         image_name: prev.image_name ? `clean-hand-${prev.image_name.replace(/^clean-hand-/, "")}` : "clean-handwriting.png",
       }));
       setCropRect(null);
-      setSuccess(`已自动去除 ${detected.elements.length} 处手写标记（安全模式）`);
+      setSuccess(
+        `已自动去除 ${detected.elements.length} 处手写标记（擦除 ${erased.removedPixels} 像素，保护 ${erased.protectedPixels} 像素）`,
+      );
     } catch (err) {
       setFailure(err?.message || "自动去手写失败");
     } finally {
@@ -1615,25 +1929,9 @@ export default function StudentDashboardPage() {
                 <div className="student-ocr-head">
                   <div>
                     <h4>题目识别结果（真实）</h4>
-                    <p>先选模式，再点每题“应用该题”。只保留 2 个核心动作：应用、精修。</p>
+                    <p>OCR 只先识别题目和基础截图，不会自动跑图示链路。每题可单独点 3 个按钮触发。</p>
                   </div>
                   <div className="student-ocr-head-actions">
-                    <div className="student-ocr-mode-tabs">
-                      <button
-                        type="button"
-                        className={`student-ocr-mode-tab ${ocrApplyMode === "snapshot" ? "active" : ""}`}
-                        onClick={() => setOcrApplyMode("snapshot")}
-                      >
-                        题干+图片
-                      </button>
-                      <button
-                        type="button"
-                        className={`student-ocr-mode-tab ${ocrApplyMode === "diagram" ? "active" : ""}`}
-                        onClick={() => setOcrApplyMode("diagram")}
-                      >
-                        只换图示
-                      </button>
-                    </div>
                     <button
                       type="button"
                       className="btn-secondary btn-small"
@@ -1645,10 +1943,7 @@ export default function StudentDashboardPage() {
                   </div>
                 </div>
                 <div className="student-ocr-mode-hint">
-                  当前模式：
-                  {ocrApplyMode === "snapshot"
-                    ? "题干+图片（会用OCR题干覆盖输入框）"
-                    : "只换图示（不覆盖你已编辑的题干）"}
+                  当前预览模式：{currentDiagramModeMeta.label}。{currentDiagramModeMeta.hint}
                 </div>
 
                 {ocrStatus === "loading" && <div className="workspace-alert">正在识别题目，请稍候...</div>}
@@ -1659,59 +1954,95 @@ export default function StudentDashboardPage() {
 
                 {ocrStatus === "success" && ocrItems.length > 0 && (
                   <div className="student-ocr-list">
-                    {ocrItems.map((item) => (
-                      <article
-                        key={item.id}
-                        className={`student-ocr-item ${selectedOcrId === item.id ? "active" : ""}`}
-                      >
-                        <div className="student-ocr-item-head">
-                          <strong>第 {item.id} 题</strong>
-                          <div className="student-ocr-item-actions">
-                            <button
-                              type="button"
-                              className="btn-ghost btn-small"
-                              onClick={() => onApplyOcrItem(item, false)}
-                            >
-                              应用该题
-                            </button>
-                            <button
-                              type="button"
-                              className="btn-ghost btn-small"
-                              onClick={() => onOpenOcrItemEditor(item)}
-                            >
-                              精修图片
-                            </button>
+                    {ocrItems.map((item) => {
+                      const originalSourcePreview = sourceImageSnapshot.data || item.questionImageUrl || item.diagramImageUrl || "";
+                      const isApplyingOriginalCrop = diagramRenderMode === "original_crop" && selectedOcrId === item.id;
+                      const isApplyingLlmCrop = diagramRequestKey === `${item.id}:llm_crop`;
+                      const isApplyingSvg = diagramRequestKey === `${item.id}:llm_svg`;
+                      return (
+                        <article
+                          key={item.id}
+                          className={`student-ocr-item ${selectedOcrId === item.id ? "active" : ""}`}
+                        >
+                          <div className="student-ocr-item-head">
+                            <strong>第 {item.id} 题</strong>
+                            <div className="student-ocr-item-actions">
+                              <button
+                                type="button"
+                                className="btn-ghost btn-small"
+                                disabled={Boolean(diagramRequestKey)}
+                                onClick={() => onApplyOcrItem(item, false, "original_crop")}
+                              >
+                                {isApplyingOriginalCrop ? "已进入原图抠图" : "1. 原图抠图"}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-ghost btn-small"
+                                disabled={Boolean(diagramRequestKey)}
+                                onClick={() => onApplyOcrItem(item, false, "llm_crop")}
+                              >
+                                {isApplyingLlmCrop ? "识别中..." : "2. LLM识别抠图"}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-ghost btn-small"
+                                disabled={Boolean(diagramRequestKey)}
+                                onClick={() => onApplyOcrItem(item, false, "llm_svg")}
+                              >
+                                {isApplyingSvg ? "生成中..." : "3. LLM生成SVG"}
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                        <p className="student-ocr-text">{item.text || "（该题未返回文字）"}</p>
-                        <div className="student-ocr-image-grid">
-                          <div className="student-ocr-image-slot">
-                            <span className="student-ocr-image-label">题目截图</span>
-                            {item.questionImageUrl ? (
-                              <div className="student-ocr-image-wrap">
-                                <img src={item.questionImageUrl} alt={`第${item.id}题题目截图`} />
-                              </div>
-                            ) : (
-                              <div className="workspace-alert">未返回题目截图</div>
-                            )}
+                          <p className="student-ocr-text">{item.text || "（该题未返回文字）"}</p>
+                          <div className="student-ocr-image-grid">
+                            <div className="student-ocr-image-slot">
+                              <span className="student-ocr-image-label">原始题目截图（仅参考）</span>
+                              {item.questionImageUrl ? (
+                                <div className="student-ocr-image-wrap">
+                                  <img src={item.questionImageUrl} alt={`第${item.id}题题目截图`} />
+                                </div>
+                              ) : (
+                                <div className="workspace-alert">未返回题目截图</div>
+                              )}
+                            </div>
+                            <div className="student-ocr-image-slot">
+                              <span className="student-ocr-image-label">
+                                {diagramRenderMode === "original_crop"
+                                  ? "原图抠图基底"
+                                  : diagramRenderMode === "llm_crop"
+                                    ? "LLM识别抠图预览"
+                                    : "LLM生成SVG说明"}
+                              </span>
+                              {diagramRenderMode === "llm_crop" && isApplyingLlmCrop ? (
+                                <div className="workspace-alert">正在生成 LLM 识别抠图...</div>
+                              ) : diagramRenderMode === "llm_crop" && item.diagramLlmImageUrl ? (
+                                <div className="student-ocr-image-wrap diagram">
+                                  <img src={item.diagramLlmImageUrl} alt={`第${item.id}题图示抠图`} />
+                                </div>
+                              ) : diagramRenderMode === "llm_svg" && isApplyingSvg ? (
+                                <div className="workspace-alert">正在生成 SVG 图示...</div>
+                              ) : diagramRenderMode === "original_crop" && originalSourcePreview ? (
+                                <div className="student-ocr-image-wrap">
+                                  <img src={originalSourcePreview} alt={`第${item.id}题原图基底`} />
+                                </div>
+                              ) : (
+                                <div className="workspace-alert">
+                                  {diagramRenderMode === "llm_crop"
+                                    ? "该题尚未生成 LLM 图示抠图，点击“2. LLM识别抠图”后按需生成。"
+                                    : diagramRenderMode === "original_crop"
+                                      ? "当前没有可用原图基底，请先上传图片或重试识别。"
+                                      : "将基于该题识别文字生成新的 SVG 图示。"}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          <div className="student-ocr-image-slot">
-                            <span className="student-ocr-image-label">图示抠图</span>
-                            {item.diagramImageUrl ? (
-                              <div className="student-ocr-image-wrap diagram">
-                                <img src={item.diagramImageUrl} alt={`第${item.id}题图示抠图`} />
-                              </div>
-                            ) : (
-                              <div className="workspace-alert">该题没有图示抠图</div>
-                            )}
-                          </div>
-                        </div>
-                      </article>
-                    ))}
+                        </article>
+                      );
+                    })}
                   </div>
                 )}
 
-                {elementEditor.open && (
+                {isOriginalCropMode && elementEditor.open && (
                   <section className="student-element-editor">
                     <div className="student-element-editor-head">
                       <div>
@@ -1805,7 +2136,7 @@ export default function StudentDashboardPage() {
               </section>
             )}
 
-            {form.image_data && (
+            {isOriginalCropMode && form.image_data && (
               <section className="student-crop-section">
                 <div className="student-crop-actions">
                   <span className="student-filter-label">前端抠图：拖拽框选题内图（集合图/几何图）</span>
@@ -1863,7 +2194,7 @@ export default function StudentDashboardPage() {
               </section>
             )}
 
-            {(form.image_data || form.image_name) && (
+            {(form.image_data || form.image_name || form.content || form.title) && (
               <section className="student-preview-section">
                 <div className="student-preview-head">
                   <h4>错题卡片预览</h4>
@@ -1884,7 +2215,7 @@ export default function StudentDashboardPage() {
                     </div>
                   ) : (
                     <div className="workspace-alert student-preview-note">
-                      当前文件不可预览：{form.image_name || "未选择图片"}（可继续保存文字版错题）
+                      当前为文字卡片模式（不使用抠图）。{form.image_name ? `附件：${form.image_name}` : "未附加图示。"}
                     </div>
                   )}
                   <p>{form.content || "请补充题目内容。"}</p>
