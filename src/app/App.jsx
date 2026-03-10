@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import AppFrameLayout from "../components/layout/AppFrameLayout.jsx";
 import HomePage from "../pages/HomePage.jsx";
 import UploadPage from "../pages/paper/UploadPage.jsx";
 import ResultPage from "../pages/paper/ResultPage.jsx";
@@ -13,13 +14,15 @@ export default function App() {
     <PaperProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/workspace" element={<WorkspacePage />} />
-          <Route path="/student/login" element={<StudentLoginPage />} />
-          <Route path="/parent/login" element={<ParentLoginPage />} />
-          <Route path="/student/dashboard" element={<StudentDashboardPage />} />
-          <Route path="/upload" element={<UploadPage />} />
-          <Route path="/result" element={<ResultPage />} />
+          <Route path="/" element={<AppFrameLayout />}>
+            <Route index element={<HomePage />} />
+            <Route path="workspace" element={<WorkspacePage />} />
+            <Route path="student/login" element={<StudentLoginPage />} />
+            <Route path="parent/login" element={<ParentLoginPage />} />
+            <Route path="student/dashboard" element={<StudentDashboardPage />} />
+            <Route path="upload" element={<UploadPage />} />
+            <Route path="result" element={<ResultPage />} />
+          </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
