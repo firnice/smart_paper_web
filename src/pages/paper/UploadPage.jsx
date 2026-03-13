@@ -39,6 +39,7 @@ export default function UploadPage() {
     resetSession,
   } = usePaper();
   const [isDragging, setIsDragging] = useState(false);
+  const recognizedItems = ocrItems.slice(0, 3);
 
   const stepIndex = getStepIndex(Boolean(file), ocrStatus);
   const statusCopy = getStatusCopy(ocrStatus, Boolean(file));
@@ -78,7 +79,6 @@ export default function UploadPage() {
       const data = await extractQuestions(file);
       setOcrItems(data.items ?? []);
       setOcrStatus("success");
-      navigate("/result");
     } catch (error) {
       setOcrStatus("error");
       setOcrError(error?.message || "识别失败，请重试");
@@ -86,36 +86,30 @@ export default function UploadPage() {
   };
 
   return (
-    <div className="page upload-flow-page">
-      <header className="hero upload-flow-hero">
-        <div className="hero-tag">上传与识别</div>
-        <h1>从一张试题开始，进入 AI 错题处理流程</h1>
-        <p>{statusCopy}</p>
-        <div className="hero-actions">
-          <Link className="btn-ghost" to="/">
-            回工作台
+    <div className="figma-page">
+      <header className="figma-page-header">
+        <div>
+          <span className="figma-kicker">上传与识别</span>
+          <h1>从一张试题开始，进入 Figma 原型里的三步识别流程。</h1>
+          <p>{statusCopy}</p>
+        </div>
+        <div className="figma-header-actions">
+          <Link className="figma-secondary-button" to="/">
+            取消
           </Link>
-          <button className="btn-primary" type="button" onClick={handleExtract} disabled={!file || ocrStatus === "loading"}>
+          <button className="figma-primary-button" type="button" onClick={handleExtract} disabled={!file || ocrStatus === "loading"}>
             {ocrStatus === "loading" ? "识别中..." : "开始识别"}
           </button>
         </div>
       </header>
 
-      <section className="upload-stepper">
-        {FLOW_STEPS.map((step, index) => {
-          const stateClass =
-            index < stepIndex ? "is-complete" : index === stepIndex ? "is-current" : "";
-
-          return (
-            <div key={step} className={`upload-step ${stateClass}`}>
-              <div className="upload-step-index">{index < stepIndex ? "✓" : index + 1}</div>
-              <div className="upload-step-copy">
-                <strong>{step}</strong>
-                <span>{index === 0 ? "选择题图" : index === 1 ? "等待分析" : "进入结果页"}</span>
-              </div>
-            </div>
-          );
-        })}
+      <section className="figma-stepper">
+        {FLOW_STEPS.map((step, index) => (
+          <div key={step} className={`figma-step ${index < stepIndex ? "is-complete" : ""} ${index === stepIndex ? "is-current" : ""}`}>
+            <div className="figma-step-index">{index < stepIndex ? "OK" : index + 1}</div>
+            <span>{step}</span>
+          </div>
+        ))}
       </section>
 
       {(ocrError || ocrStatus === "loading") && (
@@ -124,10 +118,10 @@ export default function UploadPage() {
         </div>
       )}
 
-      <section className="upload-flow-grid">
-        <article className="upload-flow-card primary">
+      <section className="figma-upload-shell">
+        <article className="figma-upload-main">
           <div
-            className={`upload-zone ${isDragging ? "dragging" : ""} ${previewUrl ? "has-file" : ""}`}
+            className={`figma-upload-zone ${isDragging ? "dragging" : ""} ${previewUrl ? "has-file" : ""}`}
             onDrop={handleDrop}
             onDragOver={(event) => {
               event.preventDefault();
@@ -138,55 +132,90 @@ export default function UploadPage() {
             <input type="file" accept="image/*" id="file-upload" onChange={handleFileChange} hidden />
 
             {previewUrl ? (
-              <div className="preview-container">
-                <img src={previewUrl} alt="Preview" className="preview-image" />
-                <div className="upload-preview-footer">
-                  <div className="upload-preview-meta">
+              <div className="figma-preview-shell">
+                <img src={previewUrl} alt="Preview" className="figma-preview-image" />
+                <div className="figma-preview-footer">
+                  <div className="figma-preview-meta">
                     <strong>{currentFileMeta?.name}</strong>
                     <span>
                       {currentFileMeta?.type} · {currentFileMeta?.size}
                     </span>
                   </div>
-                  <label htmlFor="file-upload" className="btn-secondary change-btn">
+                  <label htmlFor="file-upload" className="figma-secondary-button small">
                     更换图片
                   </label>
                 </div>
               </div>
             ) : (
-              <label htmlFor="file-upload" className="upload-label">
-                <div className="upload-icon">UP</div>
+              <label htmlFor="file-upload" className="figma-upload-label">
+                <div className="figma-upload-icon">UP</div>
                 <h3>点击或拖拽上传图片</h3>
-                <p>当前 Demo 以清晰图片识别为主，适合手机拍照或导出的题页截图。</p>
-                <span className="upload-hint-chip">支持 JPG / PNG</span>
+                <p>支持 JPG、PNG、PDF。建议优先上传单页、无遮挡、边缘完整的题图。</p>
+                <span className="figma-upload-hint">支持 JPG / PNG / PDF</span>
               </label>
             )}
           </div>
         </article>
 
-        <aside className="upload-flow-card side">
-          <div className="upload-side-block">
-            <span className="card-kicker">当前状态</span>
-            <h2>{file ? "文件已准备" : "等待上传"}</h2>
-            <p>{statusCopy}</p>
-          </div>
+        <aside className="figma-upload-side">
+          {ocrStatus === "success" ? (
+            <>
+              <div className="figma-side-panel">
+                <span className="figma-kicker">识别完成</span>
+                <h2>AI 已提取 {ocrItems.length} 道题目。</h2>
+                <p>先快速确认，再进入结果页继续生成变式题和导出。</p>
+              </div>
+              <div className="figma-result-preview-list">
+                {recognizedItems.length ? (
+                  recognizedItems.map((item, index) => (
+                    <article key={item.id || index} className="figma-result-preview-card">
+                      <strong>题目 {item.id || index + 1}</strong>
+                      <p>{item.text || "已识别题干"}</p>
+                    </article>
+                  ))
+                ) : (
+                  <article className="figma-result-preview-card">
+                    <strong>当前没有可确认的题目</strong>
+                    <p>识别完成但没有提取到题干，可以重新上传或直接去结果页手动处理。</p>
+                  </article>
+                )}
+              </div>
+              <div className="figma-upload-actions">
+                <button className="figma-primary-button" type="button" onClick={() => navigate("/result")}>
+                  确认无误，进入结果页
+                </button>
+                <button className="figma-secondary-button" type="button" onClick={() => setOcrStatus("idle")}>
+                  重新上传
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="figma-side-panel">
+                <span className="figma-kicker">当前状态</span>
+                <h2>{file ? "文件已准备" : "等待上传"}</h2>
+                <p>{statusCopy}</p>
+              </div>
 
-          <div className="upload-side-block">
-            <span className="card-kicker">识别建议</span>
-            <ul className="upload-tip-list">
-              <li>优先上传单页、无遮挡、边缘完整的题图。</li>
-              <li>如果题目带图示，尽量保证图示区域清晰可见。</li>
-              <li>识别完成后会进入结果页继续生成变式题和 PDF。</li>
-            </ul>
-          </div>
+              <div className="figma-side-panel">
+                <span className="figma-kicker">识别建议</span>
+                <ul className="figma-tip-list">
+                  <li>优先上传单页、无遮挡、边缘完整的题图。</li>
+                  <li>如果题目带图示，尽量保证图示区域清晰可见。</li>
+                  <li>识别完成后会在当前页先给你一轮确认，再进入结果页。</li>
+                </ul>
+              </div>
 
-          <div className="upload-side-actions">
-            <button className="btn-primary full-width" type="button" onClick={handleExtract} disabled={!file || ocrStatus === "loading"}>
-              {ocrStatus === "loading" ? "识别中..." : "开始识别"}
-            </button>
-            <Link className="btn-ghost full-width" to="/result">
-              查看上次结果
-            </Link>
-          </div>
+              <div className="figma-upload-actions">
+                <button className="figma-primary-button" type="button" onClick={handleExtract} disabled={!file || ocrStatus === "loading"}>
+                  {ocrStatus === "loading" ? "识别中..." : "开始识别"}
+                </button>
+                <Link className="figma-secondary-button" to="/result">
+                  查看上次结果
+                </Link>
+              </div>
+            </>
+          )}
         </aside>
       </section>
 
