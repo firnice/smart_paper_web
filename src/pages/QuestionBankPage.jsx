@@ -1,130 +1,103 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { QUESTIONS, SUBJECTS } from "../data/figmaMock.js";
+import { Search } from "lucide-react";
+import { MOCK_QUESTIONS } from "../data/figmaMock.js";
+
+const SUBJECTS = ["数学", "物理", "英语", "化学"];
 
 export default function QuestionBankPage() {
   const navigate = useNavigate();
   const [activeSubject, setActiveSubject] = useState("全部");
   const [searchQuery, setSearchQuery] = useState("");
-  const [isSelectMode, setIsSelectMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState([]);
 
-  const filteredQuestions = useMemo(
-    () =>
-      QUESTIONS.filter((question) => {
-        const matchSubject = activeSubject === "全部" || question.subject === activeSubject;
-        const haystack = `${question.originalText} ${question.topic} ${question.errorReason}`;
-        return matchSubject && haystack.includes(searchQuery.trim());
-      }),
-    [activeSubject, searchQuery],
-  );
-
-  const toggleSelected = (questionId) => {
-    setSelectedIds((current) =>
-      current.includes(questionId) ? current.filter((item) => item !== questionId) : [...current, questionId],
-    );
-  };
-
-  const handleCardClick = (questionId) => {
-    if (isSelectMode) {
-      toggleSelected(questionId);
-      return;
-    }
-    navigate(`/question/${questionId}`);
-  };
-
-  const handleToggleSelectMode = () => {
-    setIsSelectMode((current) => !current);
-    setSelectedIds([]);
-  };
-
-  const handleGoPrint = () => {
-    navigate("/print", { state: { selectedIds } });
-  };
+  const filteredQuestions = MOCK_QUESTIONS.filter((question) => {
+    const matchesSubject = activeSubject === "全部" || question.subject === activeSubject;
+    const matchesSearch =
+      question.originalText.includes(searchQuery) || question.topic.includes(searchQuery);
+    return matchesSubject && matchesSearch;
+  });
 
   return (
-    <div className="figma-page">
-      <header className="figma-page-header">
-        <div>
-          <span className="figma-kicker">错题本</span>
-          <h1>按知识点回看错题，再决定复习还是组卷。</h1>
-          <p>这一页按 Figma 原型恢复成搜索 + 科目筛选 + 组卷选择的结构。</p>
-        </div>
-        <div className="figma-header-actions">
-          <div className="figma-search">
-            <input
-              type="search"
-              placeholder="搜索题目、知识点..."
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-            />
-          </div>
-          <button type="button" className={`figma-pill-button ${isSelectMode ? "is-active" : ""}`} onClick={handleToggleSelectMode}>
-            {isSelectMode ? "取消选择" : "批量组卷"}
-          </button>
-        </div>
-      </header>
+    <div className="mx-auto max-w-2xl space-y-4 pb-4">
+      <div className="pt-2 pb-2">
+        <h1 className="text-2xl font-bold text-gray-900">错题本</h1>
+        <p className="mt-1 text-sm text-gray-500">共 {MOCK_QUESTIONS.length} 道错题</p>
+      </div>
 
-      <div className="figma-pill-row">
+      <div className="relative">
+        <Search className="absolute top-1/2 left-4 h-5 w-5 -translate-y-1/2 text-gray-400" />
+        <input
+          type="text"
+          placeholder="搜索题目或知识点..."
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          className="w-full rounded-2xl border border-gray-200 bg-white py-3 pr-4 pl-12 text-sm shadow-sm focus:border-transparent focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+        />
+      </div>
+
+      <div className="scrollbar-hide flex gap-2 overflow-x-auto pb-2">
+        <button
+          onClick={() => setActiveSubject("全部")}
+          className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm font-medium transition-all ${
+            activeSubject === "全部"
+              ? "bg-indigo-600 text-white shadow-sm"
+              : "border border-gray-200 bg-white text-gray-600"
+          }`}
+        >
+          全部
+        </button>
         {SUBJECTS.map((subject) => (
           <button
             key={subject}
-            type="button"
-            className={`figma-subject-pill ${activeSubject === subject ? "is-active" : ""}`}
             onClick={() => setActiveSubject(subject)}
+            className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm font-medium transition-all ${
+              activeSubject === subject
+                ? "bg-indigo-600 text-white shadow-sm"
+                : "border border-gray-200 bg-white text-gray-600"
+            }`}
           >
-            {subject === "全部" ? "全部科目" : subject}
+            {subject}
           </button>
         ))}
       </div>
 
-      {filteredQuestions.length ? (
-        <section className="figma-card-grid">
-          {filteredQuestions.map((question) => {
-            const selected = selectedIds.includes(question.id);
-            return (
-              <button
-                key={question.id}
-                type="button"
-                className={`figma-question-card ${selected ? "is-selected" : ""}`}
-                data-subject={question.subject}
-                onClick={() => handleCardClick(question.id)}
-              >
-                <div className="figma-question-top">
-                  <div className="figma-chip-row">
-                    <span className="figma-subject-tag">{question.subject}</span>
-                    <span className="figma-date-tag">{question.date}</span>
-                  </div>
-                  {question.isRecurring ? (
-                    <span className="figma-warn-tag">反复错 {question.recurringCount} 次</span>
-                  ) : null}
-                </div>
-                <h3>{question.originalText}</h3>
-                <p className="figma-question-topic">{question.topic}</p>
-                <div className="figma-question-bottom">
-                  <span className="figma-reason-tag">{question.errorReason}</span>
-                  <span className="figma-inline-arrow">{isSelectMode ? (selected ? "已选中" : "点击加入") : "看解析与练习"}</span>
-                </div>
-              </button>
-            );
-          })}
-        </section>
-      ) : (
-        <section className="figma-empty-card">
-          <strong>暂无符合条件的错题</strong>
-          <p>尝试调整搜索词或切换科目标签。</p>
-        </section>
-      )}
+      <div className="space-y-3 pt-2">
+        {filteredQuestions.map((question) => (
+          <div
+            key={question.id}
+            onClick={() => navigate(`/question/${question.id}`)}
+            className="active:scale-98 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-transform"
+          >
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <span className="rounded-lg bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-600">
+                {question.subject}
+              </span>
+              <span className="text-xs text-gray-400">{question.date}</span>
+            </div>
 
-      {isSelectMode ? (
-        <div className="figma-floating-bar">
-          <div>
-            <strong>{selectedIds.length}</strong>
-            <span>道题已加入打印车</span>
+            <p className="mb-3 line-clamp-2 text-sm font-medium text-gray-900">{question.originalText}</p>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500">错因:</span>
+                <span className="rounded bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-600">
+                  {question.errorReason}
+                </span>
+              </div>
+              {question.isRecurring ? (
+                <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                  反复错 {question.recurringCount}次
+                </span>
+              ) : null}
+            </div>
           </div>
-          <button type="button" className="figma-dark-button" onClick={handleGoPrint} disabled={selectedIds.length === 0}>
-            生成 A4 试卷
-          </button>
+        ))}
+      </div>
+
+      {filteredQuestions.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-gray-100 bg-white py-16">
+          <div className="mb-3 text-4xl">🔍</div>
+          <p className="text-sm text-gray-500">没有找到相关错题</p>
         </div>
       ) : null}
     </div>

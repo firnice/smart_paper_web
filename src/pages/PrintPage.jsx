@@ -1,159 +1,168 @@
-import { useMemo, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { QUESTIONS } from "../data/figmaMock.js";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Printer, CheckCircle2, ChevronDown } from "lucide-react";
+import { MOCK_QUESTIONS } from "../data/figmaMock.js";
+
+const MODES = [
+  { id: "simple", label: "仅原题", desc: "3道原题" },
+  { id: "medium", label: "适中练习", desc: "原题 + 1道变式" },
+  { id: "intensive", label: "强化训练", desc: "原题 + 3道变式" },
+];
 
 export default function PrintPage() {
-  const location = useLocation();
-  const selectedIds = location.state?.selectedIds ?? [];
-  const cartQuestions = useMemo(
-    () => (selectedIds.length ? QUESTIONS.filter((item) => selectedIds.includes(item.id)) : QUESTIONS.slice(0, 3)),
-    [selectedIds],
-  );
-
-  const [paperMode, setPaperMode] = useState("both");
-  const [variationCount, setVariationCount] = useState(1);
+  const navigate = useNavigate();
+  const selectedQuestions = MOCK_QUESTIONS.slice(0, 3);
+  const [mode, setMode] = useState("medium");
   const [hideAnswers, setHideAnswers] = useState(true);
-  const [spacing, setSpacing] = useState("medium");
-  const [mixMode, setMixMode] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isDone, setIsDone] = useState(false);
 
-  const generatedQuestions = useMemo(() => {
-    const items = [];
-    cartQuestions.forEach((question) => {
-      if (paperMode !== "variations") {
-        items.push({
-          id: `${question.id}-origin`,
-          title: `【原题】${question.topic}`,
-          content: question.originalText,
-          answer: question.correctAnswer,
-          isVariation: false,
-        });
-      }
-      if (paperMode !== "original") {
-        Array.from({ length: variationCount }).forEach((_, index) => {
-          items.push({
-            id: `${question.id}-variation-${index}`,
-            title: `【举一反三】${question.topic} · 变式 ${index + 1}`,
-            content: `围绕 ${question.topic} 改变一个关键条件，请重新建立关系并完成求解。`,
-            answer: `建议回到原题的标准思路，对比变化条件后再列式求解。`,
-            isVariation: true,
-          });
-        });
-      }
-    });
-    return mixMode ? [...items].sort((left, right) => left.id.localeCompare(right.id)).reverse() : items;
-  }, [cartQuestions, hideAnswers, mixMode, paperMode, variationCount]);
+  const resolvedModes = MODES.map((item) => ({
+    ...item,
+    count:
+      item.id === "simple"
+        ? selectedQuestions.length
+        : item.id === "medium"
+          ? selectedQuestions.length * 2
+          : selectedQuestions.length * 4,
+  }));
+
+  const currentMode = resolvedModes.find((item) => item.id === mode) || resolvedModes[1];
+
+  const handleGenerate = () => {
+    setIsGenerating(true);
+    window.setTimeout(() => {
+      setIsGenerating(false);
+      setIsDone(true);
+    }, 1500);
+  };
 
   return (
-    <div className="figma-page figma-print-page">
-      <header className="figma-page-header">
-        <div>
-          <span className="figma-kicker">智能组卷打印</span>
-          <h1>已选 {cartQuestions.length} 道基准错题，按 Figma 的出卷面板重新排版。</h1>
-          <p>支持原题、变式题、混合排序与留白高度切换。</p>
+    <div className="mx-auto max-w-2xl space-y-6 pb-4">
+      <div className="pt-2 pb-2">
+        <h1 className="text-2xl font-bold text-gray-900">组卷打印</h1>
+        <p className="mt-1 text-sm text-gray-500">已选 {selectedQuestions.length} 道错题</p>
+      </div>
+
+      <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+        <div className="mb-3 flex items-center justify-between">
+          <span className="text-sm font-medium text-gray-900">已选题目</span>
+          <button onClick={() => navigate("/bank")} className="text-sm font-medium text-indigo-600">
+            重新选择
+          </button>
         </div>
-        <Link className="figma-inline-link" to="/bank">
-          返回继续选题
-        </Link>
-      </header>
-
-      <section className="figma-print-grid">
-        <aside className="figma-print-panel">
-          <div className="figma-panel-block">
-            <span className="figma-kicker">题目构成</span>
-            <div className="figma-option-list">
-              {[
-                { id: "original", label: "仅重做原题", desc: "不含拓展" },
-                { id: "both", label: "原题 + 变式", desc: "巩固与延伸" },
-                { id: "variations", label: "仅测变式题", desc: "全新挑战" },
-              ].map((mode) => (
-                <button
-                  key={mode.id}
-                  type="button"
-                  className={`figma-option-card ${paperMode === mode.id ? "is-active" : ""}`}
-                  onClick={() => setPaperMode(mode.id)}
-                >
-                  <strong>{mode.label}</strong>
-                  <span>{mode.desc}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {paperMode !== "original" ? (
-            <div className="figma-panel-block">
-              <span className="figma-kicker">每题衍生变式数</span>
-              <div className="figma-segmented">
-                {[1, 2, 3].map((count) => (
-                  <button
-                    key={count}
-                    type="button"
-                    className={variationCount === count ? "is-active" : ""}
-                    onClick={() => setVariationCount(count)}
-                  >
-                    {count} 道
-                  </button>
-                ))}
+        <div className="space-y-2">
+          {selectedQuestions.map((question, index) => (
+            <div key={question.id} className="flex items-start gap-3 rounded-xl bg-gray-50 p-3">
+              <span className="mt-0.5 text-xs font-medium text-gray-500">{index + 1}.</span>
+              <div className="min-w-0 flex-1">
+                <span className="rounded bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-600">
+                  {question.subject}
+                </span>
+                <p className="mt-1 line-clamp-2 text-sm text-gray-900">{question.originalText}</p>
               </div>
             </div>
-          ) : null}
+          ))}
+        </div>
+      </div>
 
-          <div className="figma-panel-block">
-            <span className="figma-kicker">排版模式</span>
-            <div className="figma-inline-toggle-row">
-              <button type="button" className={!mixMode ? "is-active" : ""} onClick={() => setMixMode(false)}>
-                按原题归类
-              </button>
-              <button type="button" className={mixMode ? "is-active" : ""} onClick={() => setMixMode(true)}>
-                随机混合打乱
-              </button>
-            </div>
-            <label className="figma-switch-row">
-              <span>隐藏参考答案</span>
-              <input type="checkbox" checked={hideAnswers} onChange={() => setHideAnswers((current) => !current)} />
-            </label>
-            <label className="figma-select-row">
-              <span>作答留白区域</span>
-              <select value={spacing} onChange={(event) => setSpacing(event.target.value)}>
-                <option value="small">紧凑</option>
-                <option value="medium">适中</option>
-                <option value="large">宽敞</option>
-              </select>
-            </label>
-          </div>
-        </aside>
-
-        <div className="figma-paper-stage">
-          <article className="figma-paper-sheet">
-            <header className="figma-paper-head">
-              <h2>专属错题巩固练习卷</h2>
-              <div>
-                <span>姓名：______________</span>
-                <span>日期：______________</span>
-                <span>得分：______________</span>
-              </div>
-            </header>
-
-            <div className="figma-paper-list">
-              {generatedQuestions.map((item, index) => (
-                <article key={item.id} className="figma-paper-question">
-                  <div className="figma-paper-question-head">
-                    <strong>{index + 1}.</strong>
-                    <span className={`figma-paper-tag ${item.isVariation ? "is-variation" : ""}`}>{item.title}</span>
+      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+        <h3 className="mb-4 text-sm font-semibold text-gray-900">选择打印模式</h3>
+        <div className="space-y-2">
+          {resolvedModes.map((item) => (
+            <div
+              key={item.id}
+              onClick={() => setMode(item.id)}
+              className={`cursor-pointer rounded-xl border-2 p-4 transition-all ${
+                mode === item.id ? "border-indigo-600 bg-indigo-50" : "border-gray-200 bg-white hover:border-indigo-200"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="mb-1 flex items-center gap-2">
+                    <span className={`font-semibold ${mode === item.id ? "text-indigo-900" : "text-gray-900"}`}>
+                      {item.label}
+                    </span>
+                    <span className="text-xs text-gray-500">{item.desc}</span>
                   </div>
-                  <p>{item.content}</p>
-                  <div className={`figma-paper-space spacing-${spacing}`} />
-                  {!hideAnswers ? (
-                    <div className="figma-paper-answer">
-                      <strong>参考解析：</strong>
-                      <span>{item.answer}</span>
-                    </div>
-                  ) : null}
-                </article>
-              ))}
+                  <div className="text-sm text-gray-600">共 {item.count} 道题</div>
+                </div>
+                <div
+                  className={`flex h-5 w-5 items-center justify-center rounded-full border-2 ${
+                    mode === item.id ? "border-indigo-600 bg-indigo-600" : "border-gray-300"
+                  }`}
+                >
+                  {mode === item.id ? <div className="h-2 w-2 rounded-full bg-white" /> : null}
+                </div>
+              </div>
             </div>
-          </article>
+          ))}
         </div>
-      </section>
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+        <button onClick={() => setShowSettings((value) => !value)} className="flex w-full items-center justify-between px-5 py-4">
+          <span className="text-sm font-medium text-gray-900">高级设置</span>
+          <ChevronDown className={`h-5 w-5 text-gray-400 transition-transform ${showSettings ? "rotate-180" : ""}`} />
+        </button>
+
+        {showSettings ? (
+          <div className="space-y-4 border-t border-gray-100 px-5 pt-4 pb-5">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-700">隐藏参考答案</span>
+              <button
+                onClick={() => setHideAnswers((value) => !value)}
+                className={`relative h-6 w-12 rounded-full transition-colors ${hideAnswers ? "bg-indigo-600" : "bg-gray-300"}`}
+              >
+                <div
+                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${hideAnswers ? "left-6" : "left-0.5"}`}
+                />
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      {!isDone ? (
+        <button
+          onClick={handleGenerate}
+          disabled={isGenerating}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-4 font-semibold text-white shadow-lg transition-all hover:bg-indigo-700 disabled:bg-gray-400"
+        >
+          {isGenerating ? (
+            <span className="animate-pulse">正在生成试卷...</span>
+          ) : (
+            <>
+              <Printer className="h-5 w-5" />
+              生成 {currentMode.count} 道题试卷
+            </>
+          )}
+        </button>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex items-center justify-center gap-2 py-2 font-medium text-emerald-600">
+            <CheckCircle2 className="h-5 w-5" />
+            试卷已生成
+          </div>
+          <button className="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-4 font-semibold text-white shadow-lg transition-all hover:bg-indigo-700">
+            <Printer className="h-5 w-5" />
+            立即打印
+          </button>
+          <button
+            onClick={() => setIsDone(false)}
+            className="w-full rounded-2xl border-2 border-gray-200 bg-white py-3 font-medium text-gray-700 transition-all hover:bg-gray-50"
+          >
+            重新设置
+          </button>
+        </div>
+      )}
+
+      {!isDone ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm text-amber-800">💡 生成后可预览试卷布局，支持调整排版后再打印</p>
+        </div>
+      ) : null}
     </div>
   );
 }
