@@ -4,33 +4,39 @@ import { studentLogin } from "../../services/api.js";
 import { saveStudentSession } from "../../utils/studentSession.js";
 
 const LOGIN_HIGHLIGHTS = [
-  { value: "1", label: "后端依赖", note: "当前已接入真实学生登录接口" },
-  { value: "1", label: "必填字段", note: "只要求学生姓名即可进入工作台" },
-  { value: "M1", label: "里程碑对齐", note: "登录后进入真实错题维护工作台" },
+  { value: "3", label: "内置账号", note: "提供 3 个测试学生账号可直接登录" },
+  { value: "账号+密码", label: "登录方式", note: "已切换为学生账号密码登录" },
+  { value: "M4", label: "当前阶段", note: "登录后进入真实错题与打印流程" },
+];
+
+const PRESET_ACCOUNTS = [
+  { account: "test1", password: "test1", note: "测试学生1 / 三年级" },
+  { account: "test2", password: "test2", note: "测试学生2 / 四年级" },
+  { account: "test3", password: "test3", note: "测试学生3 / 五年级" },
 ];
 
 export default function StudentLoginPage() {
   const navigate = useNavigate();
-  const [name, setName] = useState("");
-  const [studentNo, setStudentNo] = useState("");
-  const [grade, setGrade] = useState("");
+  const [account, setAccount] = useState("test1");
+  const [password, setPassword] = useState("test1");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const fillPreset = (item) => {
+    setAccount(item.account);
+    setPassword(item.password);
+  };
 
   const onSubmit = async (event) => {
     event.preventDefault();
     setLoading(true);
     setError("");
     try {
-      const data = await studentLogin({
-        name,
-        student_no: studentNo || undefined,
-        grade: grade || undefined,
-      });
+      const data = await studentLogin({ account, password });
       saveStudentSession(data);
       navigate("/student/dashboard");
     } catch (err) {
-      setError(err?.message || "登录失败，请核对信息");
+      setError(err?.message || "登录失败，请核对账号密码");
     } finally {
       setLoading(false);
     }
@@ -42,9 +48,7 @@ export default function StudentLoginPage() {
         <div className="auth-copy-block">
           <div className="hero-tag">学生登录</div>
           <h1>先进入你的错题工作台，再开始上传、复习和生成练习。</h1>
-          <p>
-            当前已接入后端学生登录。姓名为必填项，首次登录会自动创建一个学生档案并进入学生端。
-          </p>
+          <p>当前已切换为学生账号密码登录，并内置了几组简单测试账号，便于直接联调。</p>
 
           <div className="auth-highlight-grid">
             {LOGIN_HIGHLIGHTS.map((item) => (
@@ -59,29 +63,31 @@ export default function StudentLoginPage() {
 
         <section className="auth-form-card">
           <div className="auth-form-head">
-            <h2>填写学生信息</h2>
-            <p>登录后将直接进入学生错题本页面。</p>
+            <h2>学生账号登录</h2>
+            <p>使用内置测试账号即可进入学生端。</p>
           </div>
 
           <form className="workspace-form auth-form-grid" onSubmit={onSubmit}>
             <label>
-              学生姓名
-              <input required value={name} onChange={(event) => setName(event.target.value)} />
+              账号
+              <input required value={account} onChange={(event) => setAccount(event.target.value)} />
             </label>
             <label>
-              学号（可选）
-              <input value={studentNo} onChange={(event) => setStudentNo(event.target.value)} />
-            </label>
-            <label>
-              年级（可选）
-              <input value={grade} onChange={(event) => setGrade(event.target.value)} />
+              密码
+              <input required type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
             </label>
             <div className="auth-form-tip">
-              <strong>登录说明</strong>
-              <span>如果你不填学号或年级，系统会先以默认档案进入；如存在重名学生，补充学号可帮助精确匹配。</span>
+              <strong>测试账号</strong>
+              <div className="space-y-2 pt-2">
+                {PRESET_ACCOUNTS.map((item) => (
+                  <button key={item.account} type="button" className="btn-ghost btn-small" onClick={() => fillPreset(item)}>
+                    {item.account} / {item.password} · {item.note}
+                  </button>
+                ))}
+              </div>
             </div>
             <button className="btn-primary" type="submit" disabled={loading}>
-              {loading ? "验证中..." : "进入学生端"}
+              {loading ? "登录中..." : "进入学生端"}
             </button>
           </form>
 
