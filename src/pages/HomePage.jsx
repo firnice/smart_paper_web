@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Upload, BookOpen, Printer } from "lucide-react";
+import { SquarePen, BookOpen, Printer, Clock3, CircleCheckBig } from "lucide-react";
 import { getStatisticsOverview, listWrongQuestions } from "../services/api.js";
 import { readStudentSession } from "../utils/studentSession.js";
 
@@ -39,6 +39,8 @@ export default function HomePage() {
 
   const recentQuestions = useMemo(() => questions.slice(0, 5), [questions]);
   const totalCount = questions.length;
+  const pendingCount = Math.max(0, totalCount - Number(stats?.mastered_count || 0));
+  const reviewedCount = Number(stats?.reviewing_count || 0);
 
   if (!studentId) return <div className="workspace-alert error">请先登录学生端。</div>;
 
@@ -54,20 +56,41 @@ export default function HomePage() {
       <div className="rounded-3xl bg-gradient-to-br from-indigo-600 to-indigo-700 p-6 text-white shadow-lg">
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <div className="mb-1 text-sm text-indigo-200">错题总数</div>
-            <div className="text-4xl font-bold">{totalCount}</div>
+            <div className="mb-1 text-sm text-indigo-200">今日先做什么</div>
+            <div className="text-3xl font-bold">还有 {pendingCount} 道题待处理</div>
+            <p className="mt-2 text-sm text-indigo-100">首页只看总览，真正录入、识别、精修都去工作台完成。</p>
           </div>
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/20">
-            <BookOpen className="h-8 w-8" />
+            <SquarePen className="h-8 w-8" />
           </div>
         </div>
         <button
-          onClick={() => navigate("/upload")}
+          onClick={() => navigate("/student/dashboard")}
           className="flex w-full items-center justify-center gap-2 rounded-2xl bg-white/20 py-3 font-medium text-white backdrop-blur-sm transition-all hover:bg-white/30"
         >
-          <Upload className="h-5 w-5" />
-          录入新错题
+          <SquarePen className="h-5 w-5" />
+          进入工作台
         </button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="rounded-2xl border border-gray-100 bg-white p-5 text-left shadow-sm">
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50">
+            <Clock3 className="h-6 w-6 text-amber-600" />
+          </div>
+          <div className="font-semibold text-gray-900">待复习</div>
+          <div className="mt-1 text-2xl font-bold text-gray-900">{reviewedCount}</div>
+          <div className="mt-1 text-xs text-gray-500">处于复习中的错题</div>
+        </div>
+
+        <div className="rounded-2xl border border-gray-100 bg-white p-5 text-left shadow-sm">
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50">
+            <CircleCheckBig className="h-6 w-6 text-emerald-600" />
+          </div>
+          <div className="font-semibold text-gray-900">已掌握</div>
+          <div className="mt-1 text-2xl font-bold text-gray-900">{stats?.mastered_count || 0}</div>
+          <div className="mt-1 text-xs text-gray-500">已经消化完成的错题</div>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">

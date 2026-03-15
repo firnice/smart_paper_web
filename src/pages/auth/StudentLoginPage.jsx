@@ -12,7 +12,7 @@ const PRESET_ACCOUNTS = [
 
 const HIGHLIGHTS = [
   { title: "账号密码登录", desc: "学生端已切换为正式账号密码登录" },
-  { title: "真实错题本", desc: "登录后进入真实错题、打印与回填流程" },
+  { title: "先到学生首页", desc: "登录后先看首页总览，再进入工作台处理任务" },
   { title: "可直接联调", desc: "内置测试账号，打开就能直接验证流程" },
 ];
 
@@ -54,12 +54,12 @@ export default function StudentLoginPage() {
               学生端登录
             </div>
             <h1 className="text-4xl font-black leading-tight tracking-tight">
-              先进入你的错题工作台，
+              先进入学生首页，
               <br />
-              再开始上传、复习和生成练习。
+              再去工作台处理错题。
             </h1>
             <p className="mt-4 max-w-xl text-base leading-7 text-indigo-50">
-              这里已经接上真实学生账号体系。登录后可以进入真实错题本、打印重做包，以及线下重做结果回填流程。
+              这里已经接上真实学生账号体系。登录后先看首页总览与待办，再进入工作台录入、识别、复习和打印流程。
             </p>
 
             <div className="mt-8 grid gap-3 sm:grid-cols-3">
@@ -101,7 +101,7 @@ export default function StudentLoginPage() {
                 </div>
                 <h2 className="mt-4 text-2xl font-black text-slate-900">学生账号登录</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-500">
-                  使用账号密码进入学生工作台。测试环境可直接使用左侧内置账号快速填充。
+                  使用账号密码进入学生首页。测试环境可直接使用左侧内置账号快速填充，登录后再进入工作台操作。
                 </p>
               </div>
 

@@ -2110,9 +2110,9 @@ export default function StudentDashboardPage() {
   return (
     <div className="page student-dashboard-page">
       <header className="hero student-hero">
-        <div className="hero-tag">学生错题本</div>
-        <h1>{student.name} 的错题本</h1>
-        <p>年级：{profile.grade || "-"} · 学号：{profile.student_no || "-"}</p>
+        <div className="hero-tag">学生工作台</div>
+        <h1>{student.name} 的错题工作台</h1>
+        <p>年级：{profile.grade || "-"} · 学号：{profile.student_no || "-"} · 在这里处理录入、识别、精修与维护</p>
         <div className="hero-actions">
           <button className="btn-primary" type="button" onClick={logout}>
             退出登录
@@ -2131,8 +2131,8 @@ export default function StudentDashboardPage() {
         <section className="workspace-card">
           <div className="student-stats-head">
             <div>
-              <h2>学习统计</h2>
-              <p>先看整体掌握情况，再进入下方错题列表维护。</p>
+              <h2>工作台概览</h2>
+              <p>这里是执行场：录入新错题、维护错题状态、补练习记录与精修图片。</p>
             </div>
             <button className="btn-primary" type="button" onClick={onOpenComposer}>
               添加错题
