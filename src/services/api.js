@@ -55,11 +55,17 @@ async function requestJson(path, options = {}, query = {}) {
     try {
       parsed = JSON.parse(raw);
     } catch {
+      if (response.status >= 500) {
+        throw new Error("服务暂时不可用，请稍后重试");
+      }
       throw new Error(raw || `Request failed: ${response.status}`);
     }
 
     const detail = parsed?.detail;
     if (typeof detail === "string" && detail.trim()) {
+      if (response.status >= 500) {
+        throw new Error("服务暂时不可用，请稍后重试");
+      }
       throw new Error(detail);
     }
     if (Array.isArray(detail) && detail.length > 0) {

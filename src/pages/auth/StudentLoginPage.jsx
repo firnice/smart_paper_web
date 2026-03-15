@@ -1,18 +1,19 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { BookOpen, KeyRound, LogIn, Sparkles } from "lucide-react";
 import { studentLogin } from "../../services/api.js";
 import { saveStudentSession } from "../../utils/studentSession.js";
-
-const LOGIN_HIGHLIGHTS = [
-  { value: "3", label: "内置账号", note: "提供 3 个测试学生账号可直接登录" },
-  { value: "账号+密码", label: "登录方式", note: "已切换为学生账号密码登录" },
-  { value: "M4", label: "当前阶段", note: "登录后进入真实错题与打印流程" },
-];
 
 const PRESET_ACCOUNTS = [
   { account: "test1", password: "test1", note: "测试学生1 / 三年级" },
   { account: "test2", password: "test2", note: "测试学生2 / 四年级" },
   { account: "test3", password: "test3", note: "测试学生3 / 五年级" },
+];
+
+const HIGHLIGHTS = [
+  { title: "账号密码登录", desc: "学生端已切换为正式账号密码登录" },
+  { title: "真实错题本", desc: "登录后进入真实错题、打印与回填流程" },
+  { title: "可直接联调", desc: "内置测试账号，打开就能直接验证流程" },
 ];
 
 export default function StudentLoginPage() {
@@ -25,6 +26,7 @@ export default function StudentLoginPage() {
   const fillPreset = (item) => {
     setAccount(item.account);
     setPassword(item.password);
+    setError("");
   };
 
   const onSubmit = async (event) => {
@@ -36,73 +38,131 @@ export default function StudentLoginPage() {
       saveStudentSession(data);
       navigate("/student/dashboard");
     } catch (err) {
-      setError(err?.message || "登录失败，请核对账号密码");
+      setError(err?.message || "登录失败，请核对账号密码或稍后重试");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="page auth-stage-page">
-      <section className="auth-stage">
-        <div className="auth-copy-block">
-          <div className="hero-tag">学生登录</div>
-          <h1>先进入你的错题工作台，再开始上传、复习和生成练习。</h1>
-          <p>当前已切换为学生账号密码登录，并内置了几组简单测试账号，便于直接联调。</p>
+    <div className="min-h-screen bg-slate-100 px-4 py-8 text-slate-900">
+      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-5xl items-center justify-center">
+        <div className="grid w-full gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+          <section className="rounded-[28px] bg-gradient-to-br from-indigo-600 via-indigo-600 to-violet-600 p-8 text-white shadow-[0_24px_60px_rgba(79,70,229,0.28)]">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-semibold backdrop-blur">
+              <Sparkles className="h-4 w-4" />
+              学生端登录
+            </div>
+            <h1 className="text-4xl font-black leading-tight tracking-tight">
+              先进入你的错题工作台，
+              <br />
+              再开始上传、复习和生成练习。
+            </h1>
+            <p className="mt-4 max-w-xl text-base leading-7 text-indigo-50">
+              这里已经接上真实学生账号体系。登录后可以进入真实错题本、打印重做包，以及线下重做结果回填流程。
+            </p>
 
-          <div className="auth-highlight-grid">
-            {LOGIN_HIGHLIGHTS.map((item) => (
-              <article key={item.label} className="auth-highlight-card">
-                <strong>{item.value}</strong>
-                <span>{item.label}</span>
-                <p>{item.note}</p>
-              </article>
-            ))}
-          </div>
-        </div>
+            <div className="mt-8 grid gap-3 sm:grid-cols-3">
+              {HIGHLIGHTS.map((item) => (
+                <article key={item.title} className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
+                  <div className="text-sm font-bold">{item.title}</div>
+                  <p className="mt-2 text-sm leading-6 text-indigo-50/95">{item.desc}</p>
+                </article>
+              ))}
+            </div>
 
-        <section className="auth-form-card">
-          <div className="auth-form-head">
-            <h2>学生账号登录</h2>
-            <p>使用内置测试账号即可进入学生端。</p>
-          </div>
-
-          <form className="workspace-form auth-form-grid" onSubmit={onSubmit}>
-            <label>
-              账号
-              <input required value={account} onChange={(event) => setAccount(event.target.value)} />
-            </label>
-            <label>
-              密码
-              <input required type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
-            </label>
-            <div className="auth-form-tip">
-              <strong>测试账号</strong>
-              <div className="space-y-2 pt-2">
+            <div className="mt-8 rounded-2xl border border-white/15 bg-slate-950/20 p-5 backdrop-blur-sm">
+              <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
+                <BookOpen className="h-4 w-4" />
+                内置测试账号
+              </div>
+              <div className="grid gap-2 sm:grid-cols-3">
                 {PRESET_ACCOUNTS.map((item) => (
-                  <button key={item.account} type="button" className="btn-ghost btn-small" onClick={() => fillPreset(item)}>
-                    {item.account} / {item.password} · {item.note}
+                  <button
+                    key={item.account}
+                    type="button"
+                    onClick={() => fillPreset(item)}
+                    className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-left transition hover:bg-white/15"
+                  >
+                    <div className="text-sm font-bold">{item.account}</div>
+                    <div className="mt-1 text-sm text-indigo-50">密码：{item.password}</div>
+                    <div className="mt-2 text-xs text-indigo-100/90">{item.note}</div>
                   </button>
                 ))}
               </div>
             </div>
-            <button className="btn-primary" type="submit" disabled={loading}>
-              {loading ? "登录中..." : "进入学生端"}
-            </button>
-          </form>
+          </section>
 
-          {error ? <div className="workspace-alert error">{error}</div> : null}
+          <section className="rounded-[28px] bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] sm:p-8">
+            <div className="mx-auto max-w-md">
+              <div className="mb-6">
+                <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
+                  <LogIn className="h-6 w-6" />
+                </div>
+                <h2 className="mt-4 text-2xl font-black text-slate-900">学生账号登录</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-500">
+                  使用账号密码进入学生工作台。测试环境可直接使用左侧内置账号快速填充。
+                </p>
+              </div>
 
-          <div className="hero-actions">
-            <Link className="btn-ghost" to="/">
-              回工作台
-            </Link>
-            <Link className="btn-ghost" to="/parent/login">
-              查看家长入口
-            </Link>
-          </div>
-        </section>
-      </section>
+              <form className="space-y-4" onSubmit={onSubmit}>
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-slate-700">账号</span>
+                  <input
+                    required
+                    value={account}
+                    onChange={(event) => setAccount(event.target.value)}
+                    placeholder="请输入账号，如 test1"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-base text-slate-900 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-slate-700">密码</span>
+                  <div className="relative">
+                    <KeyRound className="pointer-events-none absolute top-1/2 left-4 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      required
+                      type="password"
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      placeholder="请输入密码"
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pr-4 pl-11 text-base text-slate-900 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100"
+                    />
+                  </div>
+                </label>
+
+                {error ? (
+                  <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+                    {error}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                    登录失败时会在这里给出明确提示，不再只甩一个 500。
+                  </div>
+                )}
+
+                <button
+                  className="inline-flex w-full items-center justify-center rounded-2xl bg-indigo-600 px-4 py-3 text-base font-bold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300"
+                  type="submit"
+                  disabled={loading}
+                >
+                  {loading ? "登录中..." : "进入学生端"}
+                </button>
+              </form>
+
+              <div className="mt-6 flex flex-wrap gap-3 text-sm">
+                <Link className="rounded-xl border border-slate-200 px-4 py-2 font-medium text-slate-600 transition hover:bg-slate-50" to="/parent/login">
+                  查看家长入口
+                </Link>
+                <Link className="rounded-xl border border-slate-200 px-4 py-2 font-medium text-slate-600 transition hover:bg-slate-50" to="/student/login">
+                  刷新当前登录页
+                </Link>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
     </div>
   );
 }
