@@ -1,14 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { getDefaultSchoolTerm } from "../../services/studentDemo.js";
 import {
-  addPracticeRecord,
-  createStudentWrongQuestion,
-  getDefaultSchoolTerm,
-  getStudentDashboardData,
-  resetStudentDemoData,
-  setWrongQuestionStatus,
-} from "../../services/studentDemo.js";
-import { extractQuestions, generateDiagramCrop, generateDiagramSvg } from "../../services/api.js";
+  createStudyRecord,
+  createWrongQuestion,
+  deleteWrongQuestion,
+  extractQuestions,
+  generateDiagramCrop,
+  generateDiagramSvg,
+  getStatisticsOverview,
+  listErrorReasons,
+  listSubjects,
+  listWrongQuestionCategories,
+  listWrongQuestions,
+  updateWrongQuestion,
+} from "../../services/api.js";
 import { clearStudentSession, readStudentSession } from "../../utils/studentSession.js";
 
 const INITIAL_FORM = {
@@ -27,6 +33,15 @@ const STATUS_LABEL = {
   new: "新错题",
   reviewing: "复习中",
   mastered: "已掌握",
+};
+
+const EDIT_INITIAL = {
+  id: null,
+  title: "",
+  notes: "",
+  status: "new",
+  is_bookmarked: false,
+  error_reason_ids: [],
 };
 
 const DEFAULT_SUBJECT_OPTIONS = ["数学", "语文", "英语", "科学"];
@@ -204,6 +219,60 @@ function escapeSvgText(text) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;");
+}
+
+function inferSchoolTerm(dateLike) {
+  if (!dateLike) return "";
+  return getDefaultSchoolTerm(dateLike);
+}
+
+function buildStats(summary, listItems) {
+  const total = Number(summary?.total_wrong_questions || 0);
+  const mastered = Number(summary?.mastered_count || 0);
+  const reviewing = Number(summary?.reviewing_count || 0);
+  const newCount = Number(summary?.new_count || 0);
+  const totalReviews = Array.isArray(listItems)
+    ? listItems.reduce((sum, item) => sum + Number(item?.error_count || 0), 0)
+    : 0;
+  const masteryRate = total > 0 ? Math.round((mastered / total) * 100) : 0;
+
+  return {
+    total,
+    new_count: newCount,
+    reviewing_count: reviewing,
+    mastered_count: mastered,
+    mastery_rate: masteryRate,
+    total_reviews: totalReviews,
+  };
+}
+
+function mapWrongQuestionItem(item) {
+  const reasons = Array.isArray(item?.error_reasons) ? item.error_reasons : [];
+  const firstReason = reasons[0]?.name || "待分析";
+  const subjectName = item?.subject?.name || "未分类学科";
+  const term = inferSchoolTerm(item?.first_error_date || item?.created_at);
+
+  return {
+    id: item.id,
+    title: item.title || "未命名错题",
+    content: item.content || "",
+    subject: subjectName,
+    subject_id: item?.subject?.id || null,
+    term,
+    grade: item?.grade || "",
+    category: item?.category?.name || "未分类",
+    category_id: item?.category?.id || null,
+    error_reason: reasons.map((reason) => reason.name).join(" / ") || firstReason,
+    error_reason_ids: reasons.map((reason) => reason.id),
+    status: item?.status || "new",
+    difficulty: item?.difficulty || "medium",
+    notes: item?.notes || "",
+    is_bookmarked: Boolean(item?.is_bookmarked),
+    error_count: Number(item?.error_count || 0),
+    review_count: Number(item?.error_count || 0),
+    image_data: "",
+    image_name: "",
+  };
 }
 
 function buildDiagramReplacementDataUrl(rawText, questionId) {
@@ -827,6 +896,10 @@ export default function StudentDashboardPage() {
   const [wrongQuestions, setWrongQuestions] = useState([]);
   const [subjectOptions, setSubjectOptions] = useState([]);
   const [termOptions, setTermOptions] = useState([]);
+  const [categoryOptions, setCategoryOptions] = useState([]);
+  const [errorReasonOptions, setErrorReasonOptions] = useState([]);
+  const [editForm, setEditForm] = useState(EDIT_INITIAL);
+  const [editingItem, setEditingItem] = useState(null);
 
   const [filters, setFilters] = useState({
     keyword: "",
@@ -864,6 +937,7 @@ export default function StudentDashboardPage() {
   const [error, setError] = useState("");
 
   const studentId = session?.student?.id;
+  const profile = session?.student?.student_profile || {};
   const isOriginalCropMode = diagramRenderMode === "original_crop";
   const currentRecognitionScopeMeta =
     RECOGNITION_SCOPES.find((scope) => scope.id === recognitionScope) || RECOGNITION_SCOPES[0];
@@ -896,13 +970,38 @@ export default function StudentDashboardPage() {
     };
   })();
 
-  const refresh = useCallback(() => {
+  const refresh = useCallback(async () => {
     if (!studentId) return;
-    const data = getStudentDashboardData(studentId, filters);
-    setStats(data.stats);
-    setWrongQuestions(data.items);
-    setSubjectOptions(data.subject_options || []);
-    setTermOptions(data.term_options || []);
+
+    const [subjectsRes, categoriesRes, reasonsRes] = await Promise.all([
+      listSubjects({ limit: 100 }),
+      listWrongQuestionCategories({ limit: 100 }),
+      listErrorReasons({ limit: 200 }),
+    ]);
+
+    const subjectMap = new Map((subjectsRes?.items || []).map((item) => [item.name, item.id]));
+    const selectedSubjectId = filters.subject ? subjectMap.get(filters.subject) : undefined;
+
+    const wrongRes = await listWrongQuestions({
+      student_id: studentId,
+      subject_id: selectedSubjectId,
+      status: filters.status || undefined,
+      keyword: filters.keyword || undefined,
+      limit: 100,
+    });
+
+    const mappedItems = (wrongRes?.items || [])
+      .map(mapWrongQuestionItem)
+      .filter((item) => !filters.term || item.term === filters.term);
+
+    const statsRes = await getStatisticsOverview(studentId);
+
+    setStats(buildStats(statsRes, mappedItems));
+    setWrongQuestions(mappedItems);
+    setSubjectOptions(Array.from(new Set(mappedItems.map((item) => item.subject).filter(Boolean))));
+    setTermOptions(Array.from(new Set(mappedItems.map((item) => item.term).filter(Boolean))));
+    setCategoryOptions(categoriesRes?.items || []);
+    setErrorReasonOptions(reasonsRes?.items || []);
   }, [studentId, filters]);
 
   useEffect(() => {
@@ -910,7 +1009,9 @@ export default function StudentDashboardPage() {
       navigate("/student/login");
       return;
     }
-    refresh();
+    refresh().catch((err) => {
+      setFailure(err?.message || "学生错题本加载失败");
+    });
   }, [studentId, navigate, refresh]);
 
   const setSuccess = (message) => {
@@ -982,13 +1083,6 @@ export default function StudentDashboardPage() {
     clearStudentSession();
     setSession(null);
     navigate("/student/login");
-  };
-
-  const onResetDemo = () => {
-    if (!window.confirm("确认重置本地数据吗？")) return;
-    resetStudentDemoData();
-    refresh();
-    setSuccess("已重置本地数据");
   };
 
   const onOpenComposer = () => {
@@ -1465,12 +1559,35 @@ export default function StudentDashboardPage() {
     event.target.value = "";
   };
 
-  const persistWrongQuestion = (keepSource = false) => {
+  const persistWrongQuestion = async (keepSource = false) => {
     if (!studentId) return;
 
     setLoading(true);
     try {
-      createStudentWrongQuestion(studentId, form);
+      const subjectId = (subjectOptions.find((item) => item === form.subject) && null)
+        || null;
+      const matchedSubject = subjectOptions.find((item) => item === form.subject);
+      const subjectsRes = await listSubjects({ limit: 100 });
+      const subject = (subjectsRes?.items || []).find((item) => item.name === (matchedSubject || form.subject));
+      const category = categoryOptions.find((item) => item.name === form.category);
+      const selectedReasons = errorReasonOptions
+        .filter((item) => item.name === form.error_reason || form.error_reason.split(/\s*\/\s*/).includes(item.name))
+        .filter((item) => !category || !item.category_id || item.category_id === category.id);
+
+      await createWrongQuestion({
+        student_id: Number(studentId),
+        title: form.title || undefined,
+        content: form.content,
+        subject_id: subject?.id,
+        grade: profile.grade || undefined,
+        difficulty: form.difficulty,
+        category_id: category?.id,
+        error_reason_ids: selectedReasons.map((item) => item.id),
+        status: "new",
+        source: "manual",
+        notes: form.image_name ? `原始附件：${form.image_name}` : undefined,
+      });
+
       setForm((prev) => ({
         ...INITIAL_FORM,
         subject: prev.subject,
@@ -1495,7 +1612,7 @@ export default function StudentDashboardPage() {
         setSourceImageSnapshot({ data: "", name: "" });
         latestImageFileRef.current = null;
       }
-      refresh();
+      await refresh();
       setSuccess(keepSource ? "错题已加入错题本，可继续框选下一题" : "错题已加入错题本");
     } catch (err) {
       setFailure(err?.message || "新增错题失败");
@@ -1504,18 +1621,18 @@ export default function StudentDashboardPage() {
     }
   };
 
-  const onAddWrongQuestion = (event) => {
+  const onAddWrongQuestion = async (event) => {
     event.preventDefault();
-    persistWrongQuestion(false);
+    await persistWrongQuestion(false);
   };
 
-  const onChangeStatus = (wrongQuestionId, status) => {
+  const onChangeStatus = async (wrongQuestionId, status) => {
     if (!studentId) return;
 
     setLoading(true);
     try {
-      setWrongQuestionStatus(studentId, wrongQuestionId, status);
-      refresh();
+      await updateWrongQuestion(wrongQuestionId, { status });
+      await refresh();
       setSuccess(`已更新为${STATUS_LABEL[status]}`);
     } catch (err) {
       setFailure(err?.message || "状态更新失败");
@@ -1524,16 +1641,82 @@ export default function StudentDashboardPage() {
     }
   };
 
-  const onPractice = (wrongQuestionId, result) => {
+  const onPractice = async (wrongQuestionId, result) => {
     if (!studentId) return;
 
     setLoading(true);
     try {
-      addPracticeRecord(studentId, wrongQuestionId, result);
-      refresh();
+      await createStudyRecord(wrongQuestionId, {
+        student_id: Number(studentId),
+        result,
+        mastery_level: result === "correct" ? 4 : 2,
+      });
+      await refresh();
       setSuccess(result === "correct" ? "已记录：本次做对" : "已记录：本次仍做错");
     } catch (err) {
       setFailure(err?.message || "练习记录失败");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onToggleBookmark = async (item) => {
+    setLoading(true);
+    try {
+      await updateWrongQuestion(item.id, { is_bookmarked: !item.is_bookmarked });
+      await refresh();
+      setSuccess(item.is_bookmarked ? "已取消收藏" : "已加入收藏");
+    } catch (err) {
+      setFailure(err?.message || "收藏状态更新失败");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onDeleteWrongQuestion = async (item) => {
+    if (!window.confirm(`确认删除错题《${item.title}》吗？`)) return;
+    setLoading(true);
+    try {
+      await deleteWrongQuestion(item.id);
+      await refresh();
+      setSuccess("错题已删除");
+    } catch (err) {
+      setFailure(err?.message || "删除错题失败");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onStartEdit = (item) => {
+    setEditingItem(item);
+    setEditForm({
+      id: item.id,
+      title: item.title || "",
+      notes: item.notes || "",
+      status: item.status || "new",
+      is_bookmarked: Boolean(item.is_bookmarked),
+      error_reason_ids: item.error_reason_ids || [],
+    });
+  };
+
+  const onSubmitEdit = async (event) => {
+    event.preventDefault();
+    if (!editingItem) return;
+    setLoading(true);
+    try {
+      await updateWrongQuestion(editingItem.id, {
+        title: editForm.title || null,
+        notes: editForm.notes || null,
+        status: editForm.status,
+        is_bookmarked: editForm.is_bookmarked,
+        error_reason_ids: editForm.error_reason_ids,
+      });
+      setEditingItem(null);
+      setEditForm(EDIT_INITIAL);
+      await refresh();
+      setSuccess("错题维护已更新");
+    } catch (err) {
+      setFailure(err?.message || "错题更新失败");
     } finally {
       setLoading(false);
     }
@@ -1899,7 +2082,6 @@ export default function StudentDashboardPage() {
   if (!session?.student) return null;
 
   const student = session.student;
-  const profile = student.student_profile || {};
   const formTermOptions = Array.from(new Set([...TERM_OPTIONS, ...termOptions, getDefaultSchoolTerm()]));
   const filterSubjectOptions = Array.from(
     new Set([...DEFAULT_SUBJECT_OPTIONS, ...subjectOptions, form.subject].filter(Boolean)),
@@ -1921,9 +2103,6 @@ export default function StudentDashboardPage() {
           <Link className="btn-ghost" to="/">
             切换角色
           </Link>
-          <button className="btn-ghost" type="button" onClick={onResetDemo}>
-            重置数据
-          </button>
         </div>
       </header>
 
@@ -2052,7 +2231,8 @@ export default function StudentDashboardPage() {
                 <div className="student-question-head">
                   <div className="student-chip-row">
                     <span className="student-subject-badge">{item.subject}</span>
-                    <span className="student-term-badge">{item.term}</span>
+                    <span className="student-term-badge">{item.term || "未分期"}</span>
+                    {item.is_bookmarked ? <span className="student-term-badge">已收藏</span> : null}
                   </div>
                   <span className={`student-status status-${item.status}`}>{STATUS_LABEL[item.status]}</span>
                 </div>
@@ -2065,11 +2245,12 @@ export default function StudentDashboardPage() {
                 <p>{item.content}</p>
                 <div className="student-meta">
                   <span>学科：{item.subject}</span>
-                  <span>学期：{item.term}</span>
+                  <span>学期：{item.term || "未分期"}</span>
                   <span>分类：{item.category}</span>
                   <span>错因：{item.error_reason}</span>
-                  <span>练习：{item.review_count || 0} 次</span>
+                  <span>错次：{item.error_count || 0}</span>
                 </div>
+                {item.notes ? <div className="workspace-alert">备注：{item.notes}</div> : null}
                 <div className="student-actions">
                   <button type="button" className="btn-secondary btn-small" onClick={() => onPractice(item.id, "correct")}>
                     本次做对
@@ -2083,12 +2264,98 @@ export default function StudentDashboardPage() {
                   <button type="button" className="btn-small btn-ghost" onClick={() => onChangeStatus(item.id, "mastered")}>
                     标记已掌握
                   </button>
+                  <button type="button" className="btn-small btn-ghost" onClick={() => onToggleBookmark(item)}>
+                    {item.is_bookmarked ? "取消收藏" : "加入收藏"}
+                  </button>
+                  <button type="button" className="btn-small btn-ghost" onClick={() => onStartEdit(item)}>
+                    编辑
+                  </button>
+                  <button type="button" className="btn-small btn-ghost" onClick={() => onDeleteWrongQuestion(item)}>
+                    删除
+                  </button>
                 </div>
               </article>
             ))
           )}
         </div>
       </section>
+
+      {editingItem && (
+        <div className="student-modal-backdrop" onClick={() => setEditingItem(null)}>
+          <section className="student-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="student-modal-head">
+              <h3>编辑错题</h3>
+              <button type="button" className="btn-ghost btn-small" onClick={() => setEditingItem(null)}>
+                关闭
+              </button>
+            </div>
+            <form className="workspace-form" onSubmit={onSubmitEdit}>
+              <label>
+                标题
+                <input
+                  value={editForm.title}
+                  onChange={(event) => setEditForm((prev) => ({ ...prev, title: event.target.value }))}
+                  placeholder="错题标题"
+                />
+              </label>
+              <label>
+                状态
+                <select
+                  value={editForm.status}
+                  onChange={(event) => setEditForm((prev) => ({ ...prev, status: event.target.value }))}
+                >
+                  <option value="new">新错题</option>
+                  <option value="reviewing">复习中</option>
+                  <option value="mastered">已掌握</option>
+                </select>
+              </label>
+              <label>
+                备注
+                <textarea
+                  rows={4}
+                  value={editForm.notes}
+                  onChange={(event) => setEditForm((prev) => ({ ...prev, notes: event.target.value }))}
+                  placeholder="补充备注"
+                />
+              </label>
+              <label className="workspace-checkline">
+                <input
+                  type="checkbox"
+                  checked={editForm.is_bookmarked}
+                  onChange={(event) => setEditForm((prev) => ({ ...prev, is_bookmarked: event.target.checked }))}
+                />
+                收藏此错题
+              </label>
+              <fieldset className="workspace-reason-group">
+                <legend>错因</legend>
+                {errorReasonOptions.map((item) => (
+                  <label key={item.id} className="workspace-checkline">
+                    <input
+                      type="checkbox"
+                      checked={editForm.error_reason_ids.includes(item.id)}
+                      onChange={(event) => {
+                        setEditForm((prev) => ({
+                          ...prev,
+                          error_reason_ids: event.target.checked
+                            ? [...prev.error_reason_ids, item.id]
+                            : prev.error_reason_ids.filter((id) => id !== item.id),
+                        }));
+                      }}
+                    />
+                    {item.name}
+                  </label>
+                ))}
+              </fieldset>
+              <div className="student-actions">
+                <button type="submit" className="btn-primary btn-small">保存修改</button>
+                <button type="button" className="btn-ghost btn-small" onClick={() => setEditingItem(null)}>
+                  取消
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
 
       {isComposerOpen && (
         <div className="student-modal-backdrop" onClick={onCloseComposer}>

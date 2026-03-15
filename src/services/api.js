@@ -196,6 +196,23 @@ export async function createWrongQuestion(payload) {
   });
 }
 
+export async function updateWrongQuestion(wrongQuestionId, payload) {
+  return requestJson(`/api/wrong-questions/${wrongQuestionId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteWrongQuestion(wrongQuestionId) {
+  const url = buildUrl(`/api/wrong-questions/${wrongQuestionId}`);
+  const response = await fetch(url, { method: "DELETE" });
+  if (!response.ok) {
+    const raw = await response.text();
+    throw new Error(raw || `Request failed: ${response.status}`);
+  }
+}
+
 export async function createStudyRecord(wrongQuestionId, payload) {
   return requestJson(`/api/wrong-questions/${wrongQuestionId}/study-records`, {
     method: "POST",
