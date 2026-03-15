@@ -221,6 +221,10 @@ export async function createStudyRecord(wrongQuestionId, payload) {
   });
 }
 
+export async function listStudyRecords(wrongQuestionId, params = {}) {
+  return requestJson(`/api/wrong-questions/${wrongQuestionId}/study-records`, {}, params);
+}
+
 export async function getStatisticsOverview(studentId, params = {}) {
   return requestJson("/api/statistics/overview", {}, {
     student_id: studentId,

@@ -10,6 +10,7 @@ import {
   generateDiagramSvg,
   getStatisticsOverview,
   listErrorReasons,
+  listStudyRecords,
   listSubjects,
   listWrongQuestionCategories,
   listWrongQuestions,
@@ -231,9 +232,7 @@ function buildStats(summary, listItems) {
   const mastered = Number(summary?.mastered_count || 0);
   const reviewing = Number(summary?.reviewing_count || 0);
   const newCount = Number(summary?.new_count || 0);
-  const totalReviews = Array.isArray(listItems)
-    ? listItems.reduce((sum, item) => sum + Number(item?.error_count || 0), 0)
-    : 0;
+  const totalReviews = Number(summary?.study_records_count || 0);
   const masteryRate = total > 0 ? Math.round((mastered / total) * 100) : 0;
 
   return {
@@ -243,7 +242,16 @@ function buildStats(summary, listItems) {
     mastered_count: mastered,
     mastery_rate: masteryRate,
     total_reviews: totalReviews,
+    total_error_count: Number(summary?.total_error_count || 0),
+    list_count: Array.isArray(listItems) ? listItems.length : 0,
   };
+}
+
+function formatStudyResult(result) {
+  if (result === "correct") return "做对";
+  if (result === "incorrect") return "做错";
+  if (result === "skipped") return "跳过";
+  return result || "-";
 }
 
 function mapWrongQuestionItem(item) {
@@ -898,6 +906,7 @@ export default function StudentDashboardPage() {
   const [termOptions, setTermOptions] = useState([]);
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [errorReasonOptions, setErrorReasonOptions] = useState([]);
+  const [studyRecordMap, setStudyRecordMap] = useState({});
   const [editForm, setEditForm] = useState(EDIT_INITIAL);
   const [editingItem, setEditingItem] = useState(null);
 
@@ -994,10 +1003,18 @@ export default function StudentDashboardPage() {
       .map(mapWrongQuestionItem)
       .filter((item) => !filters.term || item.term === filters.term);
 
+    const studyEntries = await Promise.all(
+      mappedItems.map(async (item) => {
+        const response = await listStudyRecords(item.id, { limit: 5 });
+        return [item.id, response?.items || []];
+      }),
+    );
+
     const statsRes = await getStatisticsOverview(studentId);
 
     setStats(buildStats(statsRes, mappedItems));
     setWrongQuestions(mappedItems);
+    setStudyRecordMap(Object.fromEntries(studyEntries));
     setSubjectOptions(Array.from(new Set(mappedItems.map((item) => item.subject).filter(Boolean))));
     setTermOptions(Array.from(new Set(mappedItems.map((item) => item.term).filter(Boolean))));
     setCategoryOptions(categoriesRes?.items || []);
@@ -2273,6 +2290,24 @@ export default function StudentDashboardPage() {
                   <button type="button" className="btn-small btn-ghost" onClick={() => onDeleteWrongQuestion(item)}>
                     删除
                   </button>
+                </div>
+                <div className="workspace-list">
+                  <strong>最近练习记录</strong>
+                  {(studyRecordMap[item.id] || []).length === 0 ? (
+                    <div className="workspace-list-item">
+                      <span>还没有练习记录</span>
+                      <span>先做一次题就会显示在这里</span>
+                    </div>
+                  ) : (
+                    (studyRecordMap[item.id] || []).map((record) => (
+                      <div key={record.id} className="workspace-list-item">
+                        <span>{record.study_date}</span>
+                        <span>{formatStudyResult(record.result)}</span>
+                        <span>掌握度 {record.mastery_level ?? "-"}</span>
+                        <span>耗时 {record.time_spent_seconds ?? 0}s</span>
+                      </div>
+                    ))
+                  )}
                 </div>
               </article>
             ))
