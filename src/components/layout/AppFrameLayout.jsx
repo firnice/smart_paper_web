@@ -2,7 +2,7 @@ import { Outlet, NavLink, useLocation } from "react-router-dom";
 import { Home, BookOpen, Printer, User } from "lucide-react";
 
 const NAV_ITEMS = [
-  { path: "/student/dashboard", icon: Home, label: "首页" },
+  { path: "/home", icon: Home, label: "首页" },
   { path: "/bank", icon: BookOpen, label: "错题本" },
   { path: "/print", icon: Printer, label: "打印" },
   { path: "/profile", icon: User, label: "我的" },

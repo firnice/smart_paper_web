@@ -23,7 +23,7 @@ function StudentGate({ children }) {
 
 function RootRedirect() {
   const session = readStudentSession();
-  return <Navigate to={session?.student?.id ? "/student/dashboard" : "/student/login"} replace />;
+  return <Navigate to={session?.student?.id ? "/home" : "/student/login"} replace />;
 }
 
 export default function App() {

@@ -36,7 +36,7 @@ export default function StudentLoginPage() {
     try {
       const data = await studentLogin({ account, password });
       saveStudentSession(data);
-      navigate("/student/dashboard");
+      navigate("/home");
     } catch (err) {
       setError(err?.message || "登录失败，请核对账号密码或稍后重试");
     } finally {
