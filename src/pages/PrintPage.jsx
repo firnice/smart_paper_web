@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Printer, CheckCircle2, ChevronDown } from "lucide-react";
-import { listWrongQuestions } from "../services/api.js";
+import { createExport, listWrongQuestions } from "../services/api.js";
 import { readStudentSession } from "../utils/studentSession.js";
 
 const MODES = [
@@ -46,6 +46,7 @@ export default function PrintPage() {
   const [isDone, setIsDone] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [exportData, setExportData] = useState(null);
 
   useEffect(() => {
     if (!studentId) return;
@@ -92,16 +93,36 @@ export default function PrintPage() {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (selectedQuestions.length === 0) return;
     setIsGenerating(true);
-    window.setTimeout(() => {
-      setIsGenerating(false);
+    setError("");
+    try {
+      const data = await createExport({
+        title: `打印重做包-${new Date().toISOString().slice(0, 10)}`,
+        mode: "practice_sheet",
+        hide_answers: hideAnswers,
+        question_items: selectedQuestions.map((question) => ({
+          title: question.title,
+          content: question.content,
+          subject: question.subject,
+          category: question.category,
+        })),
+      });
+      setExportData(data);
       setIsDone(true);
-    }, 800);
+    } catch (err) {
+      setError(err?.message || "打印包生成失败");
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handlePrint = () => {
+    if (exportData?.download_url) {
+      window.open(exportData.download_url, "_blank", "noopener,noreferrer");
+      return;
+    }
     window.print();
   };
 
@@ -220,8 +241,18 @@ export default function PrintPage() {
           </div>
           <button onClick={handlePrint} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-4 font-semibold text-white shadow-lg transition-all hover:bg-indigo-700">
             <Printer className="h-5 w-5" />
-            立即打印
+            {exportData?.download_url ? "下载 / 打开 PDF" : "立即打印"}
           </button>
+          {exportData?.download_url ? (
+            <a
+              href={exportData.download_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block w-full rounded-2xl border-2 border-gray-200 bg-white py-3 text-center font-medium text-gray-700 transition-all hover:bg-gray-50"
+            >
+              打开导出文件
+            </a>
+          ) : null}
           <button onClick={() => setIsDone(false)} className="w-full rounded-2xl border-2 border-gray-200 bg-white py-3 font-medium text-gray-700 transition-all hover:bg-gray-50">
             重新设置
           </button>
@@ -230,7 +261,7 @@ export default function PrintPage() {
 
       <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
         <p className="text-sm text-amber-800">
-          这一步先把“真实错题选题 + 打印包准备”落地。下一步我会继续把它接到真正的多题导出接口，而不是只停留在浏览器打印。
+          现在这一步已经会调用真实导出接口生成 PDF。下一步再补“导出后回填结果 / 标记已打印待重做”的状态闭环。
         </p>
       </div>
     </div>
