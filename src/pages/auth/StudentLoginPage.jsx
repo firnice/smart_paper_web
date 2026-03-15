@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { demoStudentLogin } from "../../services/studentDemo.js";
+import { studentLogin } from "../../services/api.js";
 import { saveStudentSession } from "../../utils/studentSession.js";
 
 const LOGIN_HIGHLIGHTS = [
-  { value: "0", label: "后端依赖", note: "当前为前端 Demo 登录，不阻塞演示" },
+  { value: "1", label: "后端依赖", note: "当前已接入真实学生登录接口" },
   { value: "1", label: "必填字段", note: "只要求学生姓名即可进入工作台" },
-  { value: "5", label: "已统一页面", note: "登录后进入同套 Make 风格壳层" },
+  { value: "M1", label: "里程碑对齐", note: "登录后进入真实错题维护工作台" },
 ];
 
 export default function StudentLoginPage() {
@@ -22,7 +22,7 @@ export default function StudentLoginPage() {
     setLoading(true);
     setError("");
     try {
-      const data = demoStudentLogin({
+      const data = await studentLogin({
         name,
         student_no: studentNo || undefined,
         grade: grade || undefined,
@@ -40,10 +40,10 @@ export default function StudentLoginPage() {
     <div className="page auth-stage-page">
       <section className="auth-stage">
         <div className="auth-copy-block">
-          <div className="hero-tag">学生登录（Demo）</div>
+          <div className="hero-tag">学生登录</div>
           <h1>先进入你的错题工作台，再开始上传、复习和生成练习。</h1>
           <p>
-            当前是前端演示模式，不依赖后端账号体系。姓名为必填项，首次登录会自动创建一个学生档案并进入学生端。
+            当前已接入后端学生登录。姓名为必填项，首次登录会自动创建一个学生档案并进入学生端。
           </p>
 
           <div className="auth-highlight-grid">
@@ -77,8 +77,8 @@ export default function StudentLoginPage() {
               <input value={grade} onChange={(event) => setGrade(event.target.value)} />
             </label>
             <div className="auth-form-tip">
-              <strong>演示说明</strong>
-              <span>如果你不填学号或年级，系统会先以默认档案进入，后续仍可在学生端补充。</span>
+              <strong>登录说明</strong>
+              <span>如果你不填学号或年级，系统会先以默认档案进入；如存在重名学生，补充学号可帮助精确匹配。</span>
             </div>
             <button className="btn-primary" type="submit" disabled={loading}>
               {loading ? "验证中..." : "进入学生端"}
