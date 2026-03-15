@@ -1,10 +1,62 @@
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, SkipForward } from "lucide-react";
-import { MOCK_QUESTIONS } from "../data/figmaMock.js";
+import { createStudyRecord, listWrongQuestions } from "../services/api.js";
+import { readStudentSession } from "../utils/studentSession.js";
+
+function mapQuestion(item) {
+  return {
+    id: item.id,
+    title: item.title || "未命名错题",
+    content: item.content || "",
+    subject: item.subject?.name || "未分类学科",
+  };
+}
 
 export default function PracticePage() {
+  const { id } = useParams();
   const navigate = useNavigate();
-  const question = MOCK_QUESTIONS[0];
+  const studentId = readStudentSession()?.student?.id;
+  const [question, setQuestion] = useState(null);
+  const [answer, setAnswer] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    if (!studentId || !id) return;
+    listWrongQuestions({ student_id: studentId, limit: 100 })
+      .then((res) => {
+        const found = (res?.items || []).find((item) => String(item.id) === String(id));
+        if (!found) throw new Error("错题不存在");
+        setQuestion(mapQuestion(found));
+      })
+      .catch((err) => setError(err?.message || "练习题加载失败"));
+  }, [studentId, id]);
+
+  const submitResult = async (result) => {
+    if (!studentId || !question) return;
+    setLoading(true);
+    setError("");
+    setNotice("");
+    try {
+      await createStudyRecord(question.id, {
+        student_id: Number(studentId),
+        result,
+        mastery_level: result === "correct" ? 4 : 2,
+        notes: answer || undefined,
+      });
+      setNotice(result === "correct" ? "已记录本次做对" : result === "incorrect" ? "已记录本次做错" : "已记录本次跳过");
+    } catch (err) {
+      setError(err?.message || "练习记录提交失败");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!studentId) return <div className="workspace-alert error">请先登录学生端。</div>;
+  if (error && !question) return <div className="workspace-alert error">{error}</div>;
+  if (!question) return <div className="workspace-alert">正在加载练习题...</div>;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 pb-4">
@@ -13,51 +65,67 @@ export default function PracticePage() {
           <ArrowLeft className="h-5 w-5" />
           <span className="text-sm font-medium">退出</span>
         </button>
-        <div className="rounded-full bg-indigo-50 px-3 py-1 text-sm font-semibold text-indigo-700">1 / 3</div>
+        <div className="rounded-full bg-indigo-50 px-3 py-1 text-sm font-semibold text-indigo-700">真实练习</div>
       </div>
 
       <div className="pb-2 text-center">
-        <h1 className="mb-2 text-2xl font-bold text-gray-900">举一反三练习</h1>
+        <h1 className="mb-2 text-2xl font-bold text-gray-900">错题结果回填</h1>
         <p className="text-sm text-gray-500">
-          针对 <span className="font-semibold text-indigo-600">{question.topic}</span> 的变式训练
+          针对 <span className="font-semibold text-indigo-600">{question.title}</span> 记录这次线下重做结果
         </p>
       </div>
 
+      {error ? <div className="workspace-alert error">{error}</div> : null}
+      {notice ? <div className="workspace-alert ok">{notice}</div> : null}
+
       <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
         <div className="mb-4 flex items-center gap-2">
-          <span className="rounded bg-indigo-600 px-2 py-1 text-xs font-semibold text-white">变式题 1</span>
-          <span className="text-xs text-gray-500">难度: 中等</span>
+          <span className="rounded bg-indigo-600 px-2 py-1 text-xs font-semibold text-white">{question.subject}</span>
+          <span className="text-xs text-gray-500">线下重做后回填结果</span>
         </div>
 
-        <div className="mb-6 text-base leading-relaxed font-medium text-gray-900">
-          已知关于 {question.topic} 的相关参数发生了变化，如果在原来的基础上增加了一个变量，求证新的结果是多少？
-        </div>
+        <div className="mb-6 whitespace-pre-line text-base leading-relaxed font-medium text-gray-900">{question.content}</div>
 
         <div className="space-y-3">
-          <label className="text-sm font-semibold text-gray-700">写下你的解答：</label>
+          <label className="text-sm font-semibold text-gray-700">解答备注（可选）：</label>
           <textarea
             rows={8}
-            placeholder="在此输入你的解答过程..."
+            value={answer}
+            onChange={(event) => setAnswer(event.target.value)}
+            placeholder="可记录线下做题情况、错误点、老师批注..."
             className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm transition-all focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
           />
         </div>
       </div>
 
-      <div className="flex gap-3">
+      <div className="grid grid-cols-3 gap-3">
         <button
-          onClick={() => window.alert("已提交答案，AI正在批改中...")}
-          className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-4 font-semibold text-white shadow-lg transition-transform hover:bg-indigo-700 active:scale-95"
+          disabled={loading}
+          onClick={() => submitResult("correct")}
+          className="flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-4 font-semibold text-white shadow-lg transition-transform hover:bg-indigo-700 active:scale-95 disabled:bg-gray-400"
         >
           <CheckCircle2 className="h-5 w-5" />
-          提交答案
+          做对
         </button>
-        <button className="flex items-center gap-2 rounded-2xl border-2 border-gray-200 bg-white px-6 py-4 font-medium text-gray-600 transition-transform active:scale-95">
+        <button
+          disabled={loading}
+          onClick={() => submitResult("incorrect")}
+          className="flex items-center justify-center gap-2 rounded-2xl border-2 border-rose-200 bg-white py-4 font-medium text-rose-600 transition-transform active:scale-95 disabled:opacity-50"
+        >
+          再错
+        </button>
+        <button
+          disabled={loading}
+          onClick={() => submitResult("skipped")}
+          className="flex items-center justify-center gap-2 rounded-2xl border-2 border-gray-200 bg-white py-4 font-medium text-gray-600 transition-transform active:scale-95 disabled:opacity-50"
+        >
           <SkipForward className="h-5 w-5" />
+          跳过
         </button>
       </div>
 
       <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
-        <p className="text-sm text-blue-800">💡 提示：解题思路与原题相似，注意新增变量的影响</p>
+        <p className="text-sm text-blue-800">这页不再是 mock 练习题，而是给线下重做之后回填结果用的真实入口。</p>
       </div>
     </div>
   );
