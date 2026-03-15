@@ -1,22 +1,80 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Printer, CheckCircle2, ChevronDown } from "lucide-react";
-import { MOCK_QUESTIONS } from "../data/figmaMock.js";
+import { listWrongQuestions } from "../services/api.js";
+import { readStudentSession } from "../utils/studentSession.js";
 
 const MODES = [
-  { id: "simple", label: "仅原题", desc: "3道原题" },
-  { id: "medium", label: "适中练习", desc: "原题 + 1道变式" },
-  { id: "intensive", label: "强化训练", desc: "原题 + 3道变式" },
+  { id: "simple", label: "仅原题", desc: "按原题打印重做" },
+  { id: "medium", label: "适中练习", desc: "原题优先，预留拓展空间" },
+  { id: "intensive", label: "强化训练", desc: "更多题目，集中重做" },
 ];
+
+function inferTerm(dateLike) {
+  if (!dateLike) return "";
+  const date = new Date(dateLike);
+  if (Number.isNaN(date.getTime())) return "";
+  const month = date.getMonth() + 1;
+  return `${date.getFullYear()}${month <= 7 ? "春学期" : "秋学期"}`;
+}
+
+function mapQuestion(item) {
+  return {
+    id: item.id,
+    title: item.title || "未命名错题",
+    subject: item.subject?.name || "未分类学科",
+    content: item.content || "",
+    status: item.status || "new",
+    isBookmarked: Boolean(item.is_bookmarked),
+    category: item.category?.name || "未分类",
+    updatedAt: item.updated_at || item.created_at || "",
+    term: inferTerm(item.first_error_date || item.created_at),
+  };
+}
 
 export default function PrintPage() {
   const navigate = useNavigate();
-  const selectedQuestions = MOCK_QUESTIONS.slice(0, 3);
+  const session = readStudentSession();
+  const studentId = session?.student?.id;
+
+  const [questions, setQuestions] = useState([]);
+  const [selectedIds, setSelectedIds] = useState([]);
   const [mode, setMode] = useState("medium");
   const [hideAnswers, setHideAnswers] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDone, setIsDone] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!studentId) return;
+    let active = true;
+    setLoading(true);
+    setError("");
+    listWrongQuestions({ student_id: studentId, limit: 100 })
+      .then((res) => {
+        if (!active) return;
+        const items = (res?.items || []).map(mapQuestion);
+        setQuestions(items);
+        setSelectedIds(items.filter((item) => item.status !== "mastered").slice(0, 6).map((item) => item.id));
+      })
+      .catch((err) => {
+        if (!active) return;
+        setError(err?.message || "真实错题加载失败");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [studentId]);
+
+  const selectedQuestions = useMemo(
+    () => questions.filter((item) => selectedIds.includes(item.id)),
+    [questions, selectedIds],
+  );
 
   const resolvedModes = MODES.map((item) => ({
     ...item,
@@ -24,46 +82,80 @@ export default function PrintPage() {
       item.id === "simple"
         ? selectedQuestions.length
         : item.id === "medium"
-          ? selectedQuestions.length * 2
-          : selectedQuestions.length * 4,
+          ? selectedQuestions.length
+          : Math.max(selectedQuestions.length, Math.min(selectedQuestions.length + 2, questions.length)),
   }));
 
   const currentMode = resolvedModes.find((item) => item.id === mode) || resolvedModes[1];
 
+  const toggleQuestion = (id) => {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
+  };
+
   const handleGenerate = () => {
+    if (selectedQuestions.length === 0) return;
     setIsGenerating(true);
     window.setTimeout(() => {
       setIsGenerating(false);
       setIsDone(true);
-    }, 1500);
+    }, 800);
   };
 
-  return (
-    <div className="mx-auto max-w-2xl space-y-6 pb-4">
-      <div className="pt-2 pb-2">
-        <h1 className="text-2xl font-bold text-gray-900">组卷打印</h1>
-        <p className="mt-1 text-sm text-gray-500">已选 {selectedQuestions.length} 道错题</p>
+  const handlePrint = () => {
+    window.print();
+  };
+
+  if (!studentId) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-4 pb-4 pt-6">
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          请先登录学生端，再生成重做打印包。
+        </div>
+        <button onClick={() => navigate("/student/login")} className="btn-primary">
+          去登录
+        </button>
       </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-3xl space-y-6 pb-4">
+      <div className="pt-2 pb-2">
+        <h1 className="text-2xl font-bold text-gray-900">打印重做包</h1>
+        <p className="mt-1 text-sm text-gray-500">主流程按“选错题 → 打印 → 线下重做 → 回填结果”设计</p>
+      </div>
+
+      {error ? <div className="workspace-alert error">{error}</div> : null}
+      {loading ? <div className="workspace-alert">正在加载真实错题...</div> : null}
 
       <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
         <div className="mb-3 flex items-center justify-between">
-          <span className="text-sm font-medium text-gray-900">已选题目</span>
-          <button onClick={() => navigate("/bank")} className="text-sm font-medium text-indigo-600">
-            重新选择
-          </button>
+          <span className="text-sm font-medium text-gray-900">选择进入重做包的错题</span>
+          <span className="text-sm text-gray-500">已选 {selectedQuestions.length} 题</span>
         </div>
         <div className="space-y-2">
-          {selectedQuestions.map((question, index) => (
-            <div key={question.id} className="flex items-start gap-3 rounded-xl bg-gray-50 p-3">
-              <span className="mt-0.5 text-xs font-medium text-gray-500">{index + 1}.</span>
-              <div className="min-w-0 flex-1">
-                <span className="rounded bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-600">
-                  {question.subject}
-                </span>
-                <p className="mt-1 line-clamp-2 text-sm text-gray-900">{question.originalText}</p>
-              </div>
-            </div>
-          ))}
+          {questions.length === 0 ? (
+            <div className="rounded-xl bg-gray-50 p-3 text-sm text-gray-500">当前还没有可打印的真实错题。</div>
+          ) : (
+            questions.map((question, index) => {
+              const checked = selectedIds.includes(question.id);
+              return (
+                <label key={question.id} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 ${checked ? "border-indigo-300 bg-indigo-50" : "border-gray-200 bg-gray-50"}`}>
+                  <input type="checkbox" checked={checked} onChange={() => toggleQuestion(question.id)} className="mt-1" />
+                  <span className="mt-0.5 text-xs font-medium text-gray-500">{index + 1}.</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1 flex flex-wrap items-center gap-2">
+                      <span className="rounded bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-600">{question.subject}</span>
+                      <span className="text-xs text-gray-500">{question.term || "未分期"}</span>
+                      <span className="text-xs text-gray-500">{question.category}</span>
+                    </div>
+                    <p className="text-sm font-medium text-gray-900">{question.title}</p>
+                    <p className="mt-1 line-clamp-2 text-sm text-gray-700">{question.content}</p>
+                  </div>
+                </label>
+              );
+            })
+          )}
         </div>
       </div>
 
@@ -81,19 +173,10 @@ export default function PrintPage() {
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <div className="mb-1 flex items-center gap-2">
-                    <span className={`font-semibold ${mode === item.id ? "text-indigo-900" : "text-gray-900"}`}>
-                      {item.label}
-                    </span>
+                    <span className={`font-semibold ${mode === item.id ? "text-indigo-900" : "text-gray-900"}`}>{item.label}</span>
                     <span className="text-xs text-gray-500">{item.desc}</span>
                   </div>
-                  <div className="text-sm text-gray-600">共 {item.count} 道题</div>
-                </div>
-                <div
-                  className={`flex h-5 w-5 items-center justify-center rounded-full border-2 ${
-                    mode === item.id ? "border-indigo-600 bg-indigo-600" : "border-gray-300"
-                  }`}
-                >
-                  {mode === item.id ? <div className="h-2 w-2 rounded-full bg-white" /> : null}
+                  <div className="text-sm text-gray-600">本次预计打印 {item.count} 道题</div>
                 </div>
               </div>
             </div>
@@ -103,10 +186,9 @@ export default function PrintPage() {
 
       <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
         <button onClick={() => setShowSettings((value) => !value)} className="flex w-full items-center justify-between px-5 py-4">
-          <span className="text-sm font-medium text-gray-900">高级设置</span>
+          <span className="text-sm font-medium text-gray-900">打印设置</span>
           <ChevronDown className={`h-5 w-5 text-gray-400 transition-transform ${showSettings ? "rotate-180" : ""}`} />
         </button>
-
         {showSettings ? (
           <div className="space-y-4 border-t border-gray-100 px-5 pt-4 pb-5">
             <div className="flex items-center justify-between">
@@ -115,9 +197,7 @@ export default function PrintPage() {
                 onClick={() => setHideAnswers((value) => !value)}
                 className={`relative h-6 w-12 rounded-full transition-colors ${hideAnswers ? "bg-indigo-600" : "bg-gray-300"}`}
               >
-                <div
-                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${hideAnswers ? "left-6" : "left-0.5"}`}
-                />
+                <div className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${hideAnswers ? "left-6" : "left-0.5"}`} />
               </button>
             </div>
           </div>
@@ -127,42 +207,32 @@ export default function PrintPage() {
       {!isDone ? (
         <button
           onClick={handleGenerate}
-          disabled={isGenerating}
+          disabled={isGenerating || selectedQuestions.length === 0}
           className="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-4 font-semibold text-white shadow-lg transition-all hover:bg-indigo-700 disabled:bg-gray-400"
         >
-          {isGenerating ? (
-            <span className="animate-pulse">正在生成试卷...</span>
-          ) : (
-            <>
-              <Printer className="h-5 w-5" />
-              生成 {currentMode.count} 道题试卷
-            </>
-          )}
+          {isGenerating ? <span className="animate-pulse">正在准备打印包...</span> : <><Printer className="h-5 w-5" /> 生成打印重做包</>}
         </button>
       ) : (
         <div className="space-y-3">
           <div className="flex items-center justify-center gap-2 py-2 font-medium text-emerald-600">
             <CheckCircle2 className="h-5 w-5" />
-            试卷已生成
+            打印重做包已就绪
           </div>
-          <button className="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-4 font-semibold text-white shadow-lg transition-all hover:bg-indigo-700">
+          <button onClick={handlePrint} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-4 font-semibold text-white shadow-lg transition-all hover:bg-indigo-700">
             <Printer className="h-5 w-5" />
             立即打印
           </button>
-          <button
-            onClick={() => setIsDone(false)}
-            className="w-full rounded-2xl border-2 border-gray-200 bg-white py-3 font-medium text-gray-700 transition-all hover:bg-gray-50"
-          >
+          <button onClick={() => setIsDone(false)} className="w-full rounded-2xl border-2 border-gray-200 bg-white py-3 font-medium text-gray-700 transition-all hover:bg-gray-50">
             重新设置
           </button>
         </div>
       )}
 
-      {!isDone ? (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-          <p className="text-sm text-amber-800">💡 生成后可预览试卷布局，支持调整排版后再打印</p>
-        </div>
-      ) : null}
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+        <p className="text-sm text-amber-800">
+          这一步先把“真实错题选题 + 打印包准备”落地。下一步我会继续把它接到真正的多题导出接口，而不是只停留在浏览器打印。
+        </p>
+      </div>
     </div>
   );
 }
