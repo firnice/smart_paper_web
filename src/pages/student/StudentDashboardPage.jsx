@@ -277,7 +277,7 @@ function mapWrongQuestionItem(item) {
     notes: item?.notes || "",
     is_bookmarked: Boolean(item?.is_bookmarked),
     error_count: Number(item?.error_count || 0),
-    review_count: Number(item?.error_count || 0),
+    review_count: 0,
     image_data: "",
     image_name: "",
   };
@@ -2266,6 +2266,7 @@ export default function StudentDashboardPage() {
                   <span>分类：{item.category}</span>
                   <span>错因：{item.error_reason}</span>
                   <span>错次：{item.error_count || 0}</span>
+                  <span>练习次数：{(studyRecordMap[item.id] || []).length}</span>
                 </div>
                 {item.notes ? <div className="workspace-alert">备注：{item.notes}</div> : null}
                 <div className="student-actions">
