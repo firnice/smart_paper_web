@@ -907,6 +907,7 @@ export default function StudentDashboardPage() {
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [errorReasonOptions, setErrorReasonOptions] = useState([]);
   const [studyRecordMap, setStudyRecordMap] = useState({});
+  const [studyRecordTotalMap, setStudyRecordTotalMap] = useState({});
   const [editForm, setEditForm] = useState(EDIT_INITIAL);
   const [editingItem, setEditingItem] = useState(null);
 
@@ -1005,16 +1006,24 @@ export default function StudentDashboardPage() {
 
     const studyEntries = await Promise.all(
       mappedItems.map(async (item) => {
-        const response = await listStudyRecords(item.id, { limit: 5 });
-        return [item.id, response?.items || []];
+        const response = await listStudyRecords(item.id, { limit: 20 });
+        return [
+          item.id,
+          {
+            items: response?.items || [],
+            total: Number(response?.total || 0),
+          },
+        ];
       }),
     );
 
     const statsRes = await getStatisticsOverview(studentId);
+    const studyEntryMap = Object.fromEntries(studyEntries);
 
     setStats(buildStats(statsRes, mappedItems));
     setWrongQuestions(mappedItems);
-    setStudyRecordMap(Object.fromEntries(studyEntries));
+    setStudyRecordMap(Object.fromEntries(Object.entries(studyEntryMap).map(([id, value]) => [id, value.items])));
+    setStudyRecordTotalMap(Object.fromEntries(Object.entries(studyEntryMap).map(([id, value]) => [id, value.total])));
     setSubjectOptions(Array.from(new Set(mappedItems.map((item) => item.subject).filter(Boolean))));
     setTermOptions(Array.from(new Set(mappedItems.map((item) => item.term).filter(Boolean))));
     setCategoryOptions(categoriesRes?.items || []);
@@ -2268,7 +2277,7 @@ export default function StudentDashboardPage() {
                   <span>分类：{item.category}</span>
                   <span>错因：{item.error_reason}</span>
                   <span>错次：{item.error_count || 0}</span>
-                  <span>练习次数：{(studyRecordMap[item.id] || []).length}</span>
+                  <span>练习次数：{studyRecordTotalMap[item.id] ?? (studyRecordMap[item.id] || []).length}</span>
                 </div>
                 {item.notes ? <div className="workspace-alert">备注：{item.notes}</div> : null}
                 <div className="student-actions">
@@ -2302,14 +2311,22 @@ export default function StudentDashboardPage() {
                       <span>先做一次题就会显示在这里</span>
                     </div>
                   ) : (
-                    (studyRecordMap[item.id] || []).map((record) => (
-                      <div key={record.id} className="workspace-list-item">
-                        <span>{record.study_date}</span>
-                        <span>{formatStudyResult(record.result)}</span>
-                        <span>掌握度 {record.mastery_level ?? "-"}</span>
-                        <span>耗时 {record.time_spent_seconds ?? 0}s</span>
-                      </div>
-                    ))
+                    <>
+                      {(studyRecordMap[item.id] || []).map((record) => (
+                        <div key={record.id} className="workspace-list-item">
+                          <span>{record.study_date}</span>
+                          <span>{formatStudyResult(record.result)}</span>
+                          <span>掌握度 {record.mastery_level ?? "-"}</span>
+                          <span>耗时 {record.time_spent_seconds ?? 0}s</span>
+                        </div>
+                      ))}
+                      {(studyRecordTotalMap[item.id] || 0) > (studyRecordMap[item.id] || []).length ? (
+                        <div className="workspace-list-item">
+                          <span>仅展示最近 {(studyRecordMap[item.id] || []).length} 条</span>
+                          <span>累计 {(studyRecordTotalMap[item.id] || 0)} 次练习</span>
+                        </div>
+                      ) : null}
+                    </>
                   )}
                 </div>
               </article>
