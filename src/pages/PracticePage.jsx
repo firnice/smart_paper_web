@@ -10,6 +10,9 @@ function mapQuestion(item) {
     title: item.title || "未命名错题",
     content: item.content || "",
     subject: item.subject?.name || "未分类学科",
+    imageUrl: item.image_url || "",
+    imageName: item.image_name || "",
+    status: item.status || "new",
   };
 }
 

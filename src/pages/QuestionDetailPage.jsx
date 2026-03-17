@@ -12,6 +12,8 @@ function mapQuestion(item) {
     isRecurring: Number(item.error_count || 0) > 1,
     recurringCount: Number(item.error_count || 0),
     content: item.content || "",
+    imageUrl: item.image_url || "",
+    imageName: item.image_name || "",
     errorReason: (item.error_reasons || []).map((reason) => reason.name).join(" / ") || "待分析",
     title: item.title || "未命名错题",
     notes: item.notes || "暂无备注",
