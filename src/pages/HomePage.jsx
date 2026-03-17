@@ -40,9 +40,13 @@ export default function HomePage() {
   }, [studentId]);
 
   const recentQuestions = useMemo(() => questions.slice(0, 5), [questions]);
-  const totalCount = questions.length;
-  const pendingCount = Math.max(0, totalCount - Number(stats?.mastered_count || 0));
+  const totalCount = Number(stats?.total_wrong_questions || 0);
+  const masteredCount = Number(stats?.mastered_count || 0);
+  const newCount = Number(stats?.new_count || 0);
   const reviewedCount = Number(stats?.reviewing_count || 0);
+  const studyCount = Number(stats?.study_records_count || 0);
+  const pendingCount = Math.max(0, totalCount - masteredCount);
+  const masteryRate = totalCount > 0 ? Math.round((masteredCount / totalCount) * 100) : 0;
 
   if (!studentId) return <div className="workspace-alert error">请先登录学生端。</div>;
 
@@ -50,7 +54,7 @@ export default function HomePage() {
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="pt-2 pb-4">
         <h1 className="text-2xl font-bold text-gray-900">你好，{studentName} 👋</h1>
-        <p className="mt-1 text-sm text-gray-500">累计练习 {stats?.study_records_count || 0} 次，已掌握 {stats?.mastered_count || 0} 道错题</p>
+        <p className="mt-1 text-sm text-gray-500">累计练习 {studyCount} 次，已掌握 {masteredCount} / {totalCount} 道错题</p>
       </div>
 
       {error ? <div className="workspace-alert error">{error}</div> : null}
@@ -80,18 +84,32 @@ export default function HomePage() {
           <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50">
             <Clock3 className="h-6 w-6 text-amber-600" />
           </div>
-          <div className="font-semibold text-gray-900">待复习</div>
+          <div className="font-semibold text-gray-900">复习中</div>
           <div className="mt-1 text-2xl font-bold text-gray-900">{reviewedCount}</div>
-          <div className="mt-1 text-xs text-gray-500">处于复习中的错题</div>
+          <div className="mt-1 text-xs text-gray-500">和工作台 / 我的页保持同一状态口径</div>
         </div>
 
         <div className="rounded-2xl border border-gray-100 bg-white p-5 text-left shadow-sm">
           <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50">
             <CircleCheckBig className="h-6 w-6 text-emerald-600" />
           </div>
-          <div className="font-semibold text-gray-900">已掌握</div>
-          <div className="mt-1 text-2xl font-bold text-gray-900">{stats?.mastered_count || 0}</div>
-          <div className="mt-1 text-xs text-gray-500">已经消化完成的错题</div>
+          <div className="font-semibold text-gray-900">掌握率</div>
+          <div className="mt-1 text-2xl font-bold text-gray-900">{masteryRate}%</div>
+          <div className="mt-1 text-xs text-gray-500">已掌握 {masteredCount} 道 / 总共 {totalCount} 道</div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="rounded-2xl border border-gray-100 bg-white p-5 text-left shadow-sm">
+          <div className="font-semibold text-gray-900">新错题</div>
+          <div className="mt-1 text-2xl font-bold text-gray-900">{newCount}</div>
+          <div className="mt-1 text-xs text-gray-500">刚录入、还没进入掌握阶段</div>
+        </div>
+
+        <div className="rounded-2xl border border-gray-100 bg-white p-5 text-left shadow-sm">
+          <div className="font-semibold text-gray-900">累计练习</div>
+          <div className="mt-1 text-2xl font-bold text-gray-900">{studyCount}</div>
+          <div className="mt-1 text-xs text-gray-500">学习记录总次数，不等于错次</div>
         </div>
       </div>
 
