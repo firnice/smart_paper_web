@@ -1603,6 +1603,8 @@ export default function StudentDashboardPage() {
         status: "new",
         source: "manual",
         notes: form.image_name ? `原始附件：${form.image_name}` : undefined,
+        image_url: form.image_data || undefined,
+        image_name: form.image_name || undefined,
       });
 
       setForm((prev) => ({
