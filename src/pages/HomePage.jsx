@@ -9,6 +9,8 @@ function mapQuestion(item) {
     id: item.id,
     subject: item.subject?.name || "未分类学科",
     content: item.content || "",
+    imageUrl: item.image_url || "",
+    imageName: item.image_name || "",
     title: item.title || "未命名错题",
     errorReason: (item.error_reasons || []).map((reason) => reason.name).join(" / ") || "待分析",
     date: item.updated_at || item.created_at || "",
@@ -137,6 +139,11 @@ export default function HomePage() {
                 <span className="text-xs text-gray-400">{question.date}</span>
               </div>
               <p className="mb-1 text-sm font-semibold text-gray-900">{question.title}</p>
+              {question.imageUrl ? (
+                <div className="mb-2 overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
+                  <img src={question.imageUrl} alt={question.imageName || question.title} className="max-h-40 w-full object-contain" />
+                </div>
+              ) : null}
               <p className="mb-2 line-clamp-2 text-sm text-gray-700">{question.content}</p>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-500">错因:</span>

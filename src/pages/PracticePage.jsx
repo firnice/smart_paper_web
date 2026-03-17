@@ -84,6 +84,12 @@ export default function PracticePage() {
           <span className="text-xs text-gray-500">线下重做后回填结果</span>
         </div>
 
+        {question.imageUrl ? (
+          <div className="mb-4 overflow-hidden rounded-2xl border border-gray-100 bg-gray-50">
+            <img src={question.imageUrl} alt={question.imageName || question.title} className="max-h-[420px] w-full object-contain" />
+          </div>
+        ) : null}
+
         <div className="mb-6 whitespace-pre-line text-base leading-relaxed font-medium text-gray-900">{question.content}</div>
 
         <div className="space-y-3">

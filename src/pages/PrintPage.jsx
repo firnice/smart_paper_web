@@ -24,6 +24,8 @@ function mapQuestion(item) {
     title: item.title || "未命名错题",
     subject: item.subject?.name || "未分类学科",
     content: item.content || "",
+    imageUrl: item.image_url || "",
+    imageName: item.image_name || "",
     status: item.status || "new",
     isBookmarked: Boolean(item.is_bookmarked),
     category: item.category?.name || "未分类",
@@ -171,6 +173,11 @@ export default function PrintPage() {
                       <span className="text-xs text-gray-500">{question.category}</span>
                     </div>
                     <p className="text-sm font-medium text-gray-900">{question.title}</p>
+                    {question.imageUrl ? (
+                      <div className="mt-2 overflow-hidden rounded-xl border border-gray-100 bg-white">
+                        <img src={question.imageUrl} alt={question.imageName || question.title} className="max-h-44 w-full object-contain" />
+                      </div>
+                    ) : null}
                     <p className="mt-1 line-clamp-2 text-sm text-gray-700">{question.content}</p>
                   </div>
                 </label>
