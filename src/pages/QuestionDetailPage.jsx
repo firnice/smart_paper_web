@@ -72,6 +72,11 @@ export default function QuestionDetailPage() {
 
         <div className="pt-2">
           <h3 className="mb-2 text-base leading-relaxed font-semibold text-gray-900">{question.title}</h3>
+          {question.imageUrl ? (
+            <div className="mb-3 overflow-hidden rounded-2xl border border-gray-100 bg-gray-50">
+              <img src={question.imageUrl} alt={question.imageName || question.title} className="max-h-[420px] w-full object-contain" />
+            </div>
+          ) : null}
           <p className="whitespace-pre-line text-sm leading-relaxed text-gray-800">{question.content}</p>
         </div>
 

@@ -116,6 +116,11 @@ export default function QuestionBankPage() {
             </div>
 
             <p className="mb-1 text-sm font-semibold text-gray-900">{question.title}</p>
+            {question.imageUrl ? (
+              <div className="mb-3 overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
+                <img src={question.imageUrl} alt={question.imageName || question.title} className="max-h-48 w-full object-contain" />
+              </div>
+            ) : null}
             <p className="mb-3 line-clamp-2 text-sm text-gray-700">{question.originalText}</p>
 
             <div className="flex items-center justify-between">
