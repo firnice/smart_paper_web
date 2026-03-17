@@ -49,9 +49,12 @@ export default function StudentLoginPage() {
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-5xl items-center justify-center">
         <div className="grid w-full gap-6 lg:grid-cols-[1.05fr_0.95fr]">
           <section className="rounded-[28px] bg-gradient-to-br from-indigo-600 via-indigo-600 to-violet-600 p-8 text-white shadow-[0_24px_60px_rgba(79,70,229,0.28)]">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-semibold backdrop-blur">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-semibold backdrop-blur">
               <Sparkles className="h-4 w-4" />
               学生端登录
+            </div>
+            <div className="inline-flex items-center rounded-full border border-amber-200/40 bg-amber-400/15 px-3 py-1 text-xs font-semibold text-amber-50">
+              当前为测试环境 / 联调账号入口
             </div>
             <h1 className="text-4xl font-black leading-tight tracking-tight">
               先进入学生首页，
@@ -59,7 +62,7 @@ export default function StudentLoginPage() {
               再去工作台处理错题。
             </h1>
             <p className="mt-4 max-w-xl text-base leading-7 text-indigo-50">
-              这里已经接上真实学生账号体系。登录后先看首页总览与待办，再进入工作台录入、识别、复习和打印流程。
+              这里接的是后端真实登录接口，但当前仍使用联调测试账号，不要把它理解成正式发放中的学生账号体系。登录后可直接验证首页、工作台、复习和打印等真实链路。
             </p>
 
             <div className="mt-8 grid gap-3 sm:grid-cols-3">
@@ -85,7 +88,7 @@ export default function StudentLoginPage() {
                     className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-left transition hover:bg-white/15"
                   >
                     <div className="text-sm font-bold">{item.account}</div>
-                    <div className="mt-1 text-sm text-indigo-50">密码：{item.password}</div>
+                    <div className="mt-1 text-sm text-indigo-50">测试密码：{item.password}</div>
                     <div className="mt-2 text-xs text-indigo-100/90">{item.note}</div>
                   </button>
                 ))}
@@ -101,7 +104,7 @@ export default function StudentLoginPage() {
                 </div>
                 <h2 className="mt-4 text-2xl font-black text-slate-900">学生账号登录</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-500">
-                  当前为测试环境登录入口。可直接使用左侧内置账号快速填充，登录后验证学生端真实页面与业务链路。
+                  当前为测试环境登录入口。可直接使用左侧内置联调账号快速填充；页面与业务链路是真实的，但账号本身不是正式面向学生发放的线上账号。
                 </p>
               </div>
 
