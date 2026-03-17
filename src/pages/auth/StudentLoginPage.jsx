@@ -11,9 +11,9 @@ const PRESET_ACCOUNTS = [
 ];
 
 const HIGHLIGHTS = [
-  { title: "账号密码登录", desc: "学生端已切换为正式账号密码登录" },
+  { title: "测试账号登录", desc: "当前环境使用内置测试账号联调学生端流程" },
   { title: "先到学生首页", desc: "登录后先看首页总览，再进入工作台处理任务" },
-  { title: "可直接联调", desc: "内置测试账号，打开就能直接验证流程" },
+  { title: "真实链路验证", desc: "登录后走的首页、工作台、打印等链路都是真实页面" },
 ];
 
 export default function StudentLoginPage() {
@@ -101,7 +101,7 @@ export default function StudentLoginPage() {
                 </div>
                 <h2 className="mt-4 text-2xl font-black text-slate-900">学生账号登录</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-500">
-                  使用账号密码进入学生首页。测试环境可直接使用左侧内置账号快速填充，登录后再进入工作台操作。
+                  当前为测试环境登录入口。可直接使用左侧内置账号快速填充，登录后验证学生端真实页面与业务链路。
                 </p>
               </div>
 

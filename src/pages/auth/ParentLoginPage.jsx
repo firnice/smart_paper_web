@@ -12,8 +12,8 @@ export default function ParentLoginPage() {
       <section className="auth-stage single-column">
         <div className="auth-copy-block compact">
           <div className="hero-tag">家长入口</div>
-          <h1>家长端仍在排期中，但页面风格和应用壳层已经与学生端统一。</h1>
-          <p>当前版本先完成学生端的上传、识别、错题维护和导出演示，家长端后续会接入陪练提醒与趋势总览。</p>
+          <h1>家长端入口暂未开放，请不要把它当成已可用功能。</h1>
+          <p>当前版本优先收口学生端真实链路。家长端还没有登录、数据查询和提醒能力，暂时只保留说明页，避免后续重新拆路由结构。</p>
         </div>
 
         <section className="auth-placeholder-card">
