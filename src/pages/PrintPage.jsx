@@ -109,6 +109,7 @@ export default function PrintPage() {
           content: question.content,
           subject: question.subject,
           category: question.category,
+          image_url: question.imageUrl || undefined,
         })),
       });
       setExportData(data);
