@@ -4,6 +4,12 @@ import { ArrowLeft, CheckCircle2, SkipForward } from "lucide-react";
 import { createStudyRecord, listWrongQuestions } from "../services/api.js";
 import { readStudentSession } from "../utils/studentSession.js";
 
+const STATUS_LABEL = {
+  new: "新错题",
+  reviewing: "复习中",
+  mastered: "已掌握",
+};
+
 function mapQuestion(item) {
   return {
     id: item.id,
@@ -13,6 +19,8 @@ function mapQuestion(item) {
     imageUrl: item.image_url || "",
     imageName: item.image_name || "",
     status: item.status || "new",
+    lastPracticeResult: item.last_practice_result || "",
+    lastReviewDate: item.last_review_date || "",
   };
 }
 
@@ -26,15 +34,19 @@ export default function PracticePage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
+  const refreshQuestion = async () => {
+    if (!studentId || !id) return null;
+    const res = await listWrongQuestions({ student_id: studentId, limit: 100 });
+    const found = (res?.items || []).find((item) => String(item.id) === String(id));
+    if (!found) throw new Error("错题不存在");
+    const mapped = mapQuestion(found);
+    setQuestion(mapped);
+    return mapped;
+  };
+
   useEffect(() => {
     if (!studentId || !id) return;
-    listWrongQuestions({ student_id: studentId, limit: 100 })
-      .then((res) => {
-        const found = (res?.items || []).find((item) => String(item.id) === String(id));
-        if (!found) throw new Error("错题不存在");
-        setQuestion(mapQuestion(found));
-      })
-      .catch((err) => setError(err?.message || "练习题加载失败"));
+    refreshQuestion().catch((err) => setError(err?.message || "练习题加载失败"));
   }, [studentId, id]);
 
   const submitResult = async (result) => {
@@ -49,7 +61,15 @@ export default function PracticePage() {
         mastery_level: result === "correct" ? 4 : 2,
         notes: answer || undefined,
       });
-      setNotice(result === "correct" ? "已记录本次做对" : result === "incorrect" ? "已记录本次做错" : "已记录本次跳过");
+      const updated = await refreshQuestion();
+      const statusText = STATUS_LABEL[updated?.status] || updated?.status || "-";
+      setNotice(
+        result === "correct"
+          ? `已记录本次做对，当前状态：${statusText}`
+          : result === "incorrect"
+            ? `已记录本次做错，当前状态：${statusText}`
+            : `已记录本次跳过，当前状态：${statusText}`,
+      );
     } catch (err) {
       setError(err?.message || "练习记录提交失败");
     } finally {
@@ -76,6 +96,10 @@ export default function PracticePage() {
         <p className="text-sm text-gray-500">
           针对 <span className="font-semibold text-indigo-600">{question.title}</span> 记录这次线下重做结果
         </p>
+        <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-sm font-medium text-indigo-700">
+          <span>当前状态：{STATUS_LABEL[question.status] || question.status}</span>
+          {question.lastReviewDate ? <span>· 最近回填：{question.lastReviewDate}</span> : null}
+        </div>
       </div>
 
       {error ? <div className="workspace-alert error">{error}</div> : null}
