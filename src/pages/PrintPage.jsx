@@ -261,6 +261,14 @@ export default function PrintPage() {
               打开导出文件
             </a>
           ) : null}
+          {selectedQuestions.length > 0 ? (
+            <button
+              onClick={() => navigate(`/practice/${selectedQuestions[0].id}`)}
+              className="w-full rounded-2xl border-2 border-indigo-200 bg-indigo-50 py-3 font-medium text-indigo-700 transition-all hover:bg-indigo-100"
+            >
+              去回填第一道题的练习结果
+            </button>
+          ) : null}
           <button onClick={() => setIsDone(false)} className="w-full rounded-2xl border-2 border-gray-200 bg-white py-3 font-medium text-gray-700 transition-all hover:bg-gray-50">
             重新设置
           </button>
@@ -269,7 +277,7 @@ export default function PrintPage() {
 
       <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
         <p className="text-sm text-amber-800">
-          现在这一步已经会调用真实导出接口生成 PDF。下一步再补“导出后回填结果 / 标记已打印待重做”的状态闭环。
+          现在这一步已经会调用真实导出接口生成 PDF；导出完成后也给出直接去结果回填的下一步入口，减少主链路中断。
         </p>
       </div>
     </div>
