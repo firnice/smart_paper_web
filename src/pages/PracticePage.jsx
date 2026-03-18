@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, SkipForward } from "lucide-react";
-import { createStudyRecord, listWrongQuestions } from "../services/api.js";
+import { createStudyRecord, getWrongQuestion } from "../services/api.js";
 import { readStudentSession } from "../utils/studentSession.js";
 
 const STATUS_LABEL = {
@@ -36,10 +36,11 @@ export default function PracticePage() {
 
   const refreshQuestion = async () => {
     if (!studentId || !id) return null;
-    const res = await listWrongQuestions({ student_id: studentId, limit: 100 });
-    const found = (res?.items || []).find((item) => String(item.id) === String(id));
-    if (!found) throw new Error("错题不存在");
-    const mapped = mapQuestion(found);
+    const item = await getWrongQuestion(id);
+    if (String(item?.student?.id || "") !== String(studentId)) {
+      throw new Error("无权访问这道错题");
+    }
+    const mapped = mapQuestion(item);
     setQuestion(mapped);
     return mapped;
   };

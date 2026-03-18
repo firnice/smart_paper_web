@@ -202,6 +202,10 @@ export async function createWrongQuestion(payload) {
   });
 }
 
+export async function getWrongQuestion(wrongQuestionId) {
+  return requestJson(`/api/wrong-questions/${wrongQuestionId}`);
+}
+
 export async function updateWrongQuestion(wrongQuestionId, payload) {
   return requestJson(`/api/wrong-questions/${wrongQuestionId}`, {
     method: "PUT",

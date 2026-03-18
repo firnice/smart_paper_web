@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Printer, Play, AlertTriangle } from "lucide-react";
-import { listWrongQuestions } from "../services/api.js";
+import { getWrongQuestion } from "../services/api.js";
 import { readStudentSession } from "../utils/studentSession.js";
 
 function mapQuestion(item) {
@@ -33,11 +33,12 @@ export default function QuestionDetailPage() {
     if (!studentId || !id) return;
     setLoading(true);
     setError("");
-    listWrongQuestions({ student_id: studentId, limit: 100 })
-      .then((res) => {
-        const found = (res?.items || []).find((item) => String(item.id) === String(id));
-        if (!found) throw new Error("错题不存在");
-        setQuestion(mapQuestion(found));
+    getWrongQuestion(id)
+      .then((item) => {
+        if (String(item?.student?.id || "") !== String(studentId)) {
+          throw new Error("无权访问这道错题");
+        }
+        setQuestion(mapQuestion(item));
       })
       .catch((err) => setError(err?.message || "错题详情加载失败"))
       .finally(() => setLoading(false));
