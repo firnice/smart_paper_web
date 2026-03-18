@@ -21,6 +21,8 @@ function mapQuestion(item) {
     date: item.updated_at || item.created_at || "",
     isRecurring: Number(item.error_count || 0) > 1,
     recurringCount: Number(item.error_count || 0),
+    imageUrl: item.image_url || "",
+    imageName: item.image_name || "",
     term: inferTerm(item.first_error_date || item.created_at),
   };
 }
