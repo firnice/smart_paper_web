@@ -278,8 +278,8 @@ function mapWrongQuestionItem(item) {
     is_bookmarked: Boolean(item?.is_bookmarked),
     error_count: Number(item?.error_count || 0),
     review_count: 0,
-    image_data: "",
-    image_name: "",
+    image_data: item?.image_url || "",
+    image_name: item?.image_name || "",
   };
 }
 
