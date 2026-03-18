@@ -11,6 +11,7 @@ import PrintPage from "../pages/PrintPage.jsx";
 import StudentLoginPage from "../pages/auth/StudentLoginPage.jsx";
 import ParentLoginPage from "../pages/auth/ParentLoginPage.jsx";
 import StudentDashboardPage from "../pages/student/StudentDashboardPage.jsx";
+import WorkspacePage from "../pages/management/WorkspacePage.jsx";
 import { readStudentSession } from "../utils/studentSession.js";
 
 function StudentGate({ children }) {
@@ -34,6 +35,14 @@ export default function App() {
           <Route path="/" element={<RootRedirect />} />
           <Route path="/student/login" element={<StudentLoginPage />} />
           <Route path="/parent/login" element={<ParentLoginPage />} />
+          <Route
+            path="/management"
+            element={(
+              <StudentGate>
+                <WorkspacePage />
+              </StudentGate>
+            )}
+          />
 
           <Route
             path="/"

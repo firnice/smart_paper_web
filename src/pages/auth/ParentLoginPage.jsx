@@ -34,6 +34,9 @@ export default function ParentLoginPage() {
             <Link className="btn-primary" to="/student/login">
               先体验学生端
             </Link>
+            <Link className="btn-ghost" to="/management">
+              进入管理工作台
+            </Link>
             <Link className="btn-ghost" to="/">
               回工作台
             </Link>
