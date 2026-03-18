@@ -118,12 +118,17 @@ export default function WorkspacePage() {
   const refreshWrongQuestions = async (studentId) => {
     const query = studentId ? { student_id: studentId, limit: 100 } : { limit: 100 };
     const data = await listWrongQuestions(query);
-    setWrongQuestions(data.items ?? []);
-    const firstWrongQuestionId = data.items?.[0]?.id;
-    setStudyForm((prev) => ({
-      ...prev,
-      wrong_question_id: firstWrongQuestionId ? String(firstWrongQuestionId) : "",
-    }));
+    const items = data.items ?? [];
+    setWrongQuestions(items);
+    const firstWrongQuestionId = items[0]?.id ? String(items[0].id) : "";
+    setStudyForm((prev) => {
+      const currentId = String(prev.wrong_question_id || "");
+      const stillExists = items.some((item) => String(item.id) === currentId);
+      return {
+        ...prev,
+        wrong_question_id: stillExists ? currentId : firstWrongQuestionId,
+      };
+    });
   };
 
   const refreshStats = async (studentId) => {
