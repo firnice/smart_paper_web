@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, SkipForward } from "lucide-react";
-import { createStudyRecord, getWrongQuestion } from "../services/api.js";
+import { createStudyRecord, getWrongQuestion, resolveAssetUrl } from "../services/api.js";
 import { readStudentSession } from "../utils/studentSession.js";
 
 const STATUS_LABEL = {
@@ -16,7 +16,7 @@ function mapQuestion(item) {
     title: item.title || "未命名错题",
     content: item.content || "",
     subject: item.subject?.name || "未分类学科",
-    imageUrl: item.image_url || "",
+    imageUrl: resolveAssetUrl(item.image_url),
     imageName: item.image_name || "",
     status: item.status || "new",
     lastPracticeResult: item.last_practice_result || "",

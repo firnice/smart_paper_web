@@ -15,6 +15,38 @@ function resolveApiBase() {
 
 const API_BASE = resolveApiBase();
 
+export function resolveAssetUrl(url) {
+  const value = String(url || "").trim();
+  if (!value) return "";
+  if (value.startsWith("data:")) return value;
+
+  const apiBase = trimTrailingSlash(API_BASE);
+  const apiOrigin = (() => {
+    try {
+      return new URL(apiBase).origin;
+    } catch {
+      return "";
+    }
+  })();
+
+  if (value.startsWith("/static/")) {
+    return `${apiBase}${value}`;
+  }
+
+  if (value.startsWith("http://") || value.startsWith("https://")) {
+    try {
+      const parsed = new URL(value);
+      if (parsed.pathname.startsWith("/static/") && apiOrigin) {
+        return `${apiOrigin}${parsed.pathname}${parsed.search || ""}${parsed.hash || ""}`;
+      }
+    } catch {
+      return value;
+    }
+  }
+
+  return value;
+}
+
 function buildUrl(path, query = {}, base = API_BASE) {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   const url = new URL(`${base}${normalizedPath}`);

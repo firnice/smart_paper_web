@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { SquarePen, BookOpen, Printer, Clock3, CircleCheckBig } from "lucide-react";
-import { getStatisticsOverview, listWrongQuestions } from "../services/api.js";
+import { getStatisticsOverview, listWrongQuestions, resolveAssetUrl } from "../services/api.js";
 import { readStudentSession } from "../utils/studentSession.js";
 
 function mapQuestion(item) {
@@ -9,7 +9,7 @@ function mapQuestion(item) {
     id: item.id,
     subject: item.subject?.name || "未分类学科",
     content: item.content || "",
-    imageUrl: item.image_url || "",
+    imageUrl: resolveAssetUrl(item.image_url),
     imageName: item.image_name || "",
     title: item.title || "未命名错题",
     errorReason: (item.error_reasons || []).map((reason) => reason.name).join(" / ") || "待分析",

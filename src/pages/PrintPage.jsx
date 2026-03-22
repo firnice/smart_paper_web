@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Printer, CheckCircle2, ChevronDown } from "lucide-react";
-import { createExport, listWrongQuestions } from "../services/api.js";
+import { createExport, listWrongQuestions, resolveAssetUrl } from "../services/api.js";
 import { readStudentSession } from "../utils/studentSession.js";
 
 const MODES = [
@@ -24,7 +24,7 @@ function mapQuestion(item) {
     title: item.title || "未命名错题",
     subject: item.subject?.name || "未分类学科",
     content: item.content || "",
-    imageUrl: item.image_url || "",
+    imageUrl: resolveAssetUrl(item.image_url),
     imageName: item.image_name || "",
     status: item.status || "new",
     isBookmarked: Boolean(item.is_bookmarked),

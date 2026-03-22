@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search } from "lucide-react";
-import { listWrongQuestions } from "../services/api.js";
+import { listWrongQuestions, resolveAssetUrl } from "../services/api.js";
 import { readStudentSession } from "../utils/studentSession.js";
 
 function inferTerm(dateLike) {
@@ -21,7 +21,7 @@ function mapQuestion(item) {
     date: item.updated_at || item.created_at || "",
     isRecurring: Number(item.error_count || 0) > 1,
     recurringCount: Number(item.error_count || 0),
-    imageUrl: item.image_url || "",
+    imageUrl: resolveAssetUrl(item.image_url),
     imageName: item.image_name || "",
     term: inferTerm(item.first_error_date || item.created_at),
   };
