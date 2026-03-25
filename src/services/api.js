@@ -274,6 +274,10 @@ export async function getStatisticsOverview(studentId, params = {}) {
   });
 }
 
+export async function getStudentLoginConfig() {
+  return requestJson("/api/auth/student-login-config");
+}
+
 export async function studentLogin(payload) {
   return requestJson("/api/auth/student-login", {
     method: "POST",
