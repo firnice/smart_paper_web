@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { BookOpen, CircleCheckBig, Clock3, GraduationCap, LineChart, RefreshCcw, UserRound } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { BookOpen, CircleCheckBig, Clock3, GraduationCap, LineChart, LogOut, RefreshCcw, UserRound } from "lucide-react";
 import { getStatisticsOverview, listWrongQuestions } from "../services/api.js";
-import { readStudentSession } from "../utils/studentSession.js";
+import { clearStudentSession, readStudentSession } from "../utils/studentSession.js";
 
 function formatRatio(value) {
   if (!Number.isFinite(value)) return "0%";
@@ -35,6 +35,7 @@ const STATUS_TEXT = {
 };
 
 export default function ProfilePage() {
+  const navigate = useNavigate();
   const session = readStudentSession();
   const student = session?.student || null;
   const profile = student?.student_profile || {};
@@ -259,6 +260,18 @@ export default function ProfilePage() {
           <div className="rounded-xl bg-gray-50 p-4 text-sm text-gray-500">还没有错题，先去工作台录入第一道题。</div>
         )}
       </div>
+
+      <button
+        type="button"
+        onClick={() => {
+          clearStudentSession();
+          navigate("/student/login");
+        }}
+        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white py-3 text-sm font-medium text-red-500 shadow-sm transition active:scale-[0.98]"
+      >
+        <LogOut className="h-4 w-4" />
+        退出登录
+      </button>
     </div>
   );
 }

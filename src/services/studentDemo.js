@@ -7,13 +7,45 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-export function getDefaultSchoolTerm(dateLike) {
+const GRADE_ORDER = ["一年级", "二年级", "三年级", "四年级", "五年级", "六年级"];
+
+/**
+ * 返回当前学期，格式为"三年级下"。
+ * "上"= 秋季学期（9~1月），"下"= 春季学期（2~8月）。
+ * 无 grade 时回退为旧格式 "2026春学期"（兼容）。
+ */
+export function getDefaultSchoolTerm(dateLike, grade) {
   const date = dateLike ? new Date(dateLike) : new Date();
   const fallbackDate = Number.isNaN(date.getTime()) ? new Date() : date;
-  const year = fallbackDate.getFullYear();
   const month = fallbackDate.getMonth() + 1;
-  const season = month <= 7 ? "春学期" : "秋学期";
-  return `${year}${season}`;
+  const half = month >= 2 && month <= 8 ? "下" : "上";
+  if (grade && grade !== "未设置") {
+    return `${grade}${half}`;
+  }
+  // 无年级时回退
+  const year = fallbackDate.getFullYear();
+  return `${year}${month >= 2 && month <= 8 ? "春学期" : "秋学期"}`;
+}
+
+/**
+ * 生成学期下拉选项：当前年级上/下 + 前一个年级上/下。
+ */
+export function getTermOptions(grade) {
+  const idx = GRADE_ORDER.indexOf(grade);
+  if (idx < 0) {
+    // 未知年级，给出通用回退
+    if (grade && grade !== "未设置") {
+      return [`${grade}上`, `${grade}下`];
+    }
+    return [];
+  }
+  const options = [];
+  if (idx > 0) {
+    const prev = GRADE_ORDER[idx - 1];
+    options.push(`${prev}上`, `${prev}下`);
+  }
+  options.push(`${grade}上`, `${grade}下`);
+  return options;
 }
 
 function toSvgDataUrl(svg) {
@@ -64,11 +96,9 @@ function createStarterWrongQuestions({
   createdAt,
   grade,
 }) {
-  const baseDate = new Date(createdAt);
-  const year = Number.isNaN(baseDate.getTime()) ? new Date().getFullYear() : baseDate.getFullYear();
-  const springTerm = `${year}春学期`;
-  const fallTerm = `${year}秋学期`;
   const studentGrade = grade || DEFAULT_GRADE;
+  const termUp = `${studentGrade}上`;
+  const termDown = `${studentGrade}下`;
 
   return [
     {
@@ -77,7 +107,7 @@ function createStarterWrongQuestions({
       title: "集合交集判断",
       content: "已知 A={1,2,3,4}, B={3,4,5,6}，请写出 A∩B。",
       subject: "数学",
-      term: springTerm,
+      term: termDown,
       grade: studentGrade,
       category: "集合概念",
       error_reason: "交集概念混淆",
@@ -96,7 +126,7 @@ function createStarterWrongQuestions({
       title: "三角形高与面积",
       content: "根据图示，底边=8，高=h，写出面积表达式。",
       subject: "数学",
-      term: fallTerm,
+      term: termUp,
       grade: studentGrade,
       category: "几何图示",
       error_reason: "公式套用错误",
@@ -115,7 +145,7 @@ function createStarterWrongQuestions({
       title: "看图写话",
       content: "用 3 句话描述图中的春游场景。",
       subject: "语文",
-      term: springTerm,
+      term: termDown,
       grade: studentGrade,
       category: "表达不完整",
       error_reason: "审题不清",
@@ -134,7 +164,7 @@ function createStarterWrongQuestions({
       title: "时态选择",
       content: "Yesterday I ___ to school by bus.",
       subject: "英语",
-      term: fallTerm,
+      term: termUp,
       grade: studentGrade,
       category: "语法错误",
       error_reason: "规则混淆",
@@ -153,7 +183,7 @@ function createStarterWrongQuestions({
       title: "植物蒸腾作用判断",
       content: "实验中叶片套袋后出现水珠，现象说明了什么？",
       subject: "科学",
-      term: springTerm,
+      term: termDown,
       grade: studentGrade,
       category: "实验分析",
       error_reason: "因果关系判断错误",
@@ -265,7 +295,7 @@ function migrateDb(db) {
       term:
         sanitizeText(item.term) && sanitizeText(item.term) !== "未分期"
           ? sanitizeText(item.term)
-          : getDefaultSchoolTerm(item.created_at || item.updated_at),
+          : getDefaultSchoolTerm(item.created_at || item.updated_at, item.grade),
       image_data: item.image_data || null,
       image_name: item.image_name || null,
     })),
@@ -486,7 +516,7 @@ export function createStudentWrongQuestion(studentId, payload) {
     title: sanitizeText(payload?.title) || "未命名错题",
     content: content || "已通过照片录入，待补充文字内容",
     subject: sanitizeText(payload?.subject) || "未分类学科",
-    term: sanitizeText(payload?.term) || getDefaultSchoolTerm(now),
+    term: sanitizeText(payload?.term) || getDefaultSchoolTerm(now, sanitizeText(payload?.grade)),
     grade: sanitizeText(payload?.grade) || DEFAULT_GRADE,
     category: sanitizeText(payload?.category) || "未分类",
     error_reason: sanitizeText(payload?.error_reason) || "待分析",

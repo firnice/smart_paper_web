@@ -137,15 +137,7 @@ export default function HomePage() {
         </button>
       </div>
 
-      <div>
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-semibold text-gray-900">最近错题</h2>
-          <button onClick={() => navigate("/bank")} className="text-sm font-medium text-indigo-600">
-            查看全部
-          </button>
-        </div>
-
-        <div className="space-y-3">
+      <div className="space-y-3">
           {recentQuestions.map((question) => (
             <div
               key={question.id}
@@ -169,7 +161,6 @@ export default function HomePage() {
               </div>
             </div>
           ))}
-        </div>
       </div>
     </div>
   );

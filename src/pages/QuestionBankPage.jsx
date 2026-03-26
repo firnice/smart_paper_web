@@ -3,12 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { Search } from "lucide-react";
 import { listWrongQuestions, resolveAssetUrl } from "../services/api.js";
 import { readStudentSession } from "../utils/studentSession.js";
+import { getDefaultSchoolTerm } from "../services/studentDemo.js";
 
-function inferTerm(dateLike) {
+function inferTerm(dateLike, grade) {
   if (!dateLike) return "";
-  const date = new Date(dateLike);
-  if (Number.isNaN(date.getTime())) return "";
-  return `${date.getFullYear()}${date.getMonth() + 1 <= 7 ? "春学期" : "秋学期"}`;
+  return getDefaultSchoolTerm(dateLike, grade);
 }
 
 function mapQuestion(item) {
@@ -23,7 +22,7 @@ function mapQuestion(item) {
     recurringCount: Number(item.error_count || 0),
     imageUrl: resolveAssetUrl(item.image_url),
     imageName: item.image_name || "",
-    term: inferTerm(item.first_error_date || item.created_at),
+    term: inferTerm(item.first_error_date || item.created_at, item.grade),
   };
 }
 

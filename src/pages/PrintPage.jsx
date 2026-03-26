@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Printer, CheckCircle2, ChevronDown } from "lucide-react";
 import { createExport, listWrongQuestions, resolveAssetUrl } from "../services/api.js";
 import { readStudentSession } from "../utils/studentSession.js";
+import { getDefaultSchoolTerm } from "../services/studentDemo.js";
 
 const MODES = [
   { id: "simple", label: "仅原题", desc: "按原题打印重做" },
@@ -10,12 +11,9 @@ const MODES = [
   { id: "intensive", label: "强化训练", desc: "更多题目，集中重做" },
 ];
 
-function inferTerm(dateLike) {
+function inferTerm(dateLike, grade) {
   if (!dateLike) return "";
-  const date = new Date(dateLike);
-  if (Number.isNaN(date.getTime())) return "";
-  const month = date.getMonth() + 1;
-  return `${date.getFullYear()}${month <= 7 ? "春学期" : "秋学期"}`;
+  return getDefaultSchoolTerm(dateLike, grade);
 }
 
 function mapQuestion(item) {
@@ -30,7 +28,7 @@ function mapQuestion(item) {
     isBookmarked: Boolean(item.is_bookmarked),
     category: item.category?.name || "未分类",
     updatedAt: item.updated_at || item.created_at || "",
-    term: inferTerm(item.first_error_date || item.created_at),
+    term: inferTerm(item.first_error_date || item.created_at, item.grade),
   };
 }
 

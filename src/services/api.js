@@ -142,6 +142,14 @@ export async function generateDiagramSvg(payload) {
   });
 }
 
+export async function analyzeQuestion(payload) {
+  return requestJson("/api/ocr/analyze-question", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function generateVariants(payload) {
   return requestJson("/api/variants/generate", {
     method: "POST",

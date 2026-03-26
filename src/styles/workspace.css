@@ -372,6 +372,40 @@
 .workspace-checkline { flex-direction: row !important; align-items: center; }
 .workspace-reason-group { grid-column: 1 / -1; border:1px solid #e2e8f0; border-radius:16px; padding:12px; }
 
+/* 识别/分析中的阻塞蒙版 */
+.student-composer-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(2px);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 28px;
+}
+.student-composer-overlay-content {
+  text-align: center;
+  color: #4f46e5;
+  font-size: 15px;
+  font-weight: 500;
+}
+.student-composer-overlay-content p {
+  margin-top: 14px;
+}
+.student-composer-spinner {
+  width: 36px;
+  height: 36px;
+  margin: 0 auto;
+  border: 3px solid #e0e7ff;
+  border-top-color: #4f46e5;
+  border-radius: 50%;
+  animation: composer-spin 0.7s linear infinite;
+}
+@keyframes composer-spin {
+  to { transform: rotate(360deg); }
+}
+
 @media (max-width: 768px) {
   .page { padding-bottom: 24px; }
   .hero, .workspace-card, .student-modal { padding: 16px; }

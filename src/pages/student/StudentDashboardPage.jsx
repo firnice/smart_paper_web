@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { getDefaultSchoolTerm } from "../../services/studentDemo.js";
+import { getDefaultSchoolTerm, getTermOptions } from "../../services/studentDemo.js";
 import {
+  analyzeQuestion,
   createStudyRecord,
   createWrongQuestion,
   deleteWrongQuestion,
@@ -23,7 +24,7 @@ const INITIAL_FORM = {
   title: "",
   content: "",
   subject: "数学",
-  term: getDefaultSchoolTerm(),
+  term: "",
   category: "计算错误",
   error_reason: "粗心抄错",
   difficulty: "medium",
@@ -71,15 +72,6 @@ const RECOGNITION_SCOPES = [
 const PAPER_ZOOM_MIN = 0.5;
 const PAPER_ZOOM_MAX = 3;
 const PAPER_ZOOM_STEP = 0.25;
-
-const TERM_OPTIONS = Array.from(
-  new Set([
-    `${new Date().getFullYear() - 1}秋学期`,
-    getDefaultSchoolTerm(),
-    `${new Date().getFullYear()}秋学期`,
-    `${new Date().getFullYear() + 1}春学期`,
-  ]),
-);
 
 const DIAGRAM_RENDER_MODES = [
   {
@@ -223,9 +215,9 @@ function escapeSvgText(text) {
     .replace(/'/g, "&apos;");
 }
 
-function inferSchoolTerm(dateLike) {
+function inferSchoolTerm(dateLike, grade) {
   if (!dateLike) return "";
-  return getDefaultSchoolTerm(dateLike);
+  return getDefaultSchoolTerm(dateLike, grade);
 }
 
 function buildStats(summary, listItems) {
@@ -259,7 +251,7 @@ function mapWrongQuestionItem(item) {
   const reasons = Array.isArray(item?.error_reasons) ? item.error_reasons : [];
   const firstReason = reasons[0]?.name || "待分析";
   const subjectName = item?.subject?.name || "未分类学科";
-  const term = inferSchoolTerm(item?.first_error_date || item?.created_at);
+  const term = inferSchoolTerm(item?.first_error_date || item?.created_at, item?.grade);
 
   return {
     id: item.id,
@@ -899,6 +891,7 @@ export default function StudentDashboardPage() {
   const cropImageRef = useRef(null);
   const elementStageRef = useRef(null);
   const latestImageFileRef = useRef(null);
+  const lastAnalyzedTextRef = useRef("");
 
   const [session, setSession] = useState(() => readStudentSession());
   const [stats, setStats] = useState(null);
@@ -943,6 +936,7 @@ export default function StudentDashboardPage() {
   const [elementDraftStart, setElementDraftStart] = useState(null);
   const [elementDraftRect, setElementDraftRect] = useState(null);
 
+  const [analyzing, setAnalyzing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -1041,6 +1035,16 @@ export default function StudentDashboardPage() {
     });
   }, [studentId, navigate, refresh]);
 
+  // 当 profile.grade 可用后，给 form.term 设置默认值
+  useEffect(() => {
+    const grade = profile.grade;
+    if (!grade) return;
+    setForm((prev) => {
+      if (prev.term) return prev;
+      return { ...prev, term: getDefaultSchoolTerm(null, grade) };
+    });
+  }, [profile.grade]);
+
   const setSuccess = (message) => {
     setError("");
     setNotice(message);
@@ -1071,6 +1075,33 @@ export default function StudentDashboardPage() {
     );
   };
 
+  const runQuestionAnalysis = (questionText) => {
+    if (!questionText) return;
+    if (questionText === lastAnalyzedTextRef.current) return;
+    lastAnalyzedTextRef.current = questionText;
+    setAnalyzing(true);
+    analyzeQuestion({
+      question_text: questionText,
+      grade: profile.grade || "",
+    })
+      .then((result) => {
+        if (!result) return;
+        setForm((prev) => ({
+          ...prev,
+          subject: result.subject || prev.subject,
+          category: result.category || prev.category,
+          error_reason: result.error_reason || prev.error_reason,
+          title: result.title || prev.title,
+        }));
+      })
+      .catch(() => {
+        // 分析失败不影响主流程，用户可以手动填写
+      })
+      .finally(() => {
+        setAnalyzing(false);
+      });
+  };
+
   const applyOcrTextOnly = (item) => {
     if (!item) return;
     const normalizedText = normalizeTextForCard(item.text);
@@ -1081,6 +1112,7 @@ export default function StudentDashboardPage() {
       title: prev.title || baseTitle,
       content: normalizedText || prev.content,
     }));
+    runQuestionAnalysis(normalizedText);
   };
 
   const resetElementEditor = () => {
@@ -1147,6 +1179,7 @@ export default function StudentDashboardPage() {
     setSelectedOcrId(null);
     resetElementEditor();
     latestImageFileRef.current = null;
+    lastAnalyzedTextRef.current = "";
   };
 
   const onApplyOcrItem = async (item, silent = false, mode = diagramRenderMode) => {
@@ -1199,6 +1232,7 @@ export default function StudentDashboardPage() {
             : `已应用第 ${item.id} 题：使用本地模板生成 SVG 图示（后端未返回SVG）`,
         );
       }
+      runQuestionAnalysis(normalizedText);
       return true;
     }
 
@@ -1245,6 +1279,7 @@ export default function StudentDashboardPage() {
       if (!silent) {
         setSuccess(`已应用第 ${item.id} 题：使用 LLM 识别抠图`);
       }
+      runQuestionAnalysis(normalizedText);
       return true;
     }
 
@@ -1265,6 +1300,7 @@ export default function StudentDashboardPage() {
     if (!silent) {
       setSuccess(`已应用第 ${item.id} 题：进入原图抠图模式（可继续精修）`);
     }
+    runQuestionAnalysis(normalizedText);
     return true;
   };
 
@@ -2111,12 +2147,13 @@ export default function StudentDashboardPage() {
   if (!session?.student) return null;
 
   const student = session.student;
-  const formTermOptions = Array.from(new Set([...TERM_OPTIONS, ...termOptions, getDefaultSchoolTerm()]));
+  const gradeTermOptions = getTermOptions(profile.grade);
+  const formTermOptions = Array.from(new Set([...gradeTermOptions, ...termOptions, form.term].filter(Boolean)));
   const filterSubjectOptions = Array.from(
     new Set([...DEFAULT_SUBJECT_OPTIONS, ...subjectOptions, form.subject].filter(Boolean)),
   );
   const filterTermOptions = Array.from(
-    new Set([...TERM_OPTIONS, ...termOptions, getDefaultSchoolTerm(), form.term].filter(Boolean)),
+    new Set([...gradeTermOptions, ...termOptions, form.term].filter(Boolean)),
   );
 
   return (
@@ -2125,14 +2162,6 @@ export default function StudentDashboardPage() {
         <div className="hero-tag">学生工作台</div>
         <h1>{student.name} 的错题工作台</h1>
         <p>年级：{profile.grade || "-"} · 学号：{profile.student_no || "-"} · 在这里处理录入、识别、精修与维护</p>
-        <div className="hero-actions">
-          <button className="btn-primary" type="button" onClick={logout}>
-            退出登录
-          </button>
-          <Link className="btn-ghost" to="/">
-            切换角色
-          </Link>
-        </div>
       </header>
 
       {notice && <div className="workspace-alert ok">{notice}</div>}
@@ -2206,7 +2235,7 @@ export default function StudentDashboardPage() {
         </div>
 
         <div className="student-filter-block">
-          <span className="student-filter-label">按学期分期筛选</span>
+          <span className="student-filter-label">按学期筛选</span>
           <div className="student-filter-tabs">
             <button
               type="button"
@@ -2266,12 +2295,12 @@ export default function StudentDashboardPage() {
                   <span className={`student-status status-${item.status}`}>{STATUS_LABEL[item.status]}</span>
                 </div>
                 <strong className="student-question-title">{item.title}</strong>
+                <p>{item.content}</p>
                 {item.image_data && (
                   <div className="student-question-image-wrap">
                     <img className="student-question-image" src={item.image_data} alt={item.image_name || item.title} />
                   </div>
                 )}
-                <p>{item.content}</p>
                 <div className="student-meta">
                   <span>学科：{item.subject}</span>
                   <span>学期：{item.term || "未分期"}</span>
@@ -2415,7 +2444,15 @@ export default function StudentDashboardPage() {
 
       {isComposerOpen && (
         <div className="student-modal-backdrop" onClick={onCloseComposer}>
-          <section className="student-modal" onClick={(event) => event.stopPropagation()}>
+          <section className="student-modal" onClick={(event) => event.stopPropagation()} style={{ position: "relative" }}>
+            {(ocrStatus === "loading" || analyzing || diagramRequestKey) && (
+              <div className="student-composer-overlay">
+                <div className="student-composer-overlay-content">
+                  <div className="student-composer-spinner" />
+                  <p>{analyzing ? "正在智能分析题目，自动填写中..." : diagramRequestKey ? "正在生成图示，请稍候..." : "正在识别题目，请稍候..."}</p>
+                </div>
+              </div>
+            )}
             <div className="student-modal-head">
               <h3>添加错题</h3>
               <button type="button" className="btn-ghost btn-small" onClick={onCloseComposer}>
@@ -2865,21 +2902,21 @@ export default function StudentDashboardPage() {
                   <div className="student-question-head">
                     <div className="student-chip-row">
                       <span className="student-subject-badge">{form.subject || "未分类学科"}</span>
-                      <span className="student-term-badge">{form.term || getDefaultSchoolTerm()}</span>
+                      <span className="student-term-badge">{form.term || getDefaultSchoolTerm(null, profile.grade)}</span>
                     </div>
                     <span className="student-status status-new">新错题</span>
                   </div>
                   <strong className="student-question-title">{form.title || "未命名错题"}</strong>
+                  <p>{form.content || "请补充题目内容。"}</p>
                   {form.image_data ? (
                     <div className="student-question-image-wrap">
                       <img className="student-question-image" src={form.image_data} alt={form.image_name || "错题图片预览"} />
                     </div>
-                  ) : (
+                  ) : form.image_name ? (
                     <div className="workspace-alert student-preview-note">
-                      当前为文字卡片模式（不使用抠图）。{form.image_name ? `附件：${form.image_name}` : "未附加图示。"}
+                      附件：{form.image_name}
                     </div>
-                  )}
-                  <p>{form.content || "请补充题目内容。"}</p>
+                  ) : null}
                   <div className="student-meta">
                     <span>分类：{form.category || "未分类"}</span>
                     <span>错因：{form.error_reason || "待分析"}</span>
@@ -2909,7 +2946,7 @@ export default function StudentDashboardPage() {
                 </select>
               </label>
               <label>
-                学期分期
+                学期
                 <select
                   value={form.term}
                   onChange={(event) => setForm((prev) => ({ ...prev, term: event.target.value }))}
