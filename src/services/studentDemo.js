@@ -589,6 +589,74 @@ export function addPracticeRecord(studentId, wrongQuestionId, result) {
   return target;
 }
 
+export function demoGenerateVariants(wrongQuestionId) {
+  const db = loadDb();
+  const question = db.wrongQuestions.find((q) => q.id === Number(wrongQuestionId));
+  if (!question) return { source_question_id: wrongQuestionId, items: [] };
+
+  return {
+    source_question_id: question.id,
+    items: [
+      {
+        text: `(变式1) 把原题中的数字改变：${(question.content || question.title || "").slice(0, 30)}...的类似题`,
+        answer: "参考答案：运用相同方法，注意计算过程",
+        hint: "解题方法与原题相同，注意审题",
+      },
+      {
+        text: `(变式2) 换一个场景：如果将题目中的条件稍作改变，应该怎样求解？`,
+        answer: "参考答案：方法不变，数字和场景改变",
+        hint: "先分析题目条件的变化，再套用方法",
+      },
+      {
+        text: `(变式3) 提高难度：在原题基础上增加一个条件，该怎样解题？`,
+        answer: "参考答案：分步骤求解，注意新增条件",
+        hint: "多了一个条件，需要多一步计算",
+      },
+    ],
+  };
+}
+
+export function demoTrendAnalysis(studentId) {
+  return {
+    id: Date.now(),
+    student_id: Number(studentId),
+    status: "completed",
+    created_at: new Date().toISOString(),
+    completed_at: new Date().toISOString(),
+    analysis_result: {
+      summary: "近期学习整体表现不错，数学计算能力有明显进步，但语文看图写话和英语时态运用仍需加强练习。建议针对薄弱环节制定专项练习计划。",
+      subject_analyses: [
+        {
+          subject: "数学",
+          severity: "正常",
+          detail: "计算类错题减少，说明基础计算能力在提升。集合交集相关题目仍有困难，建议用韦恩图辅助理解。",
+          suggestions: ["每天做5道计算练习保持手感", "用画图法理解集合关系"],
+        },
+        {
+          subject: "语文",
+          severity: "需关注",
+          detail: "看图写话描述不够完整，缺少细节描写。需要加强观察力和表达能力的训练。",
+          suggestions: ["每天观察一幅图片，练习描述", "阅读优秀范文学习描写方法"],
+        },
+        {
+          subject: "英语",
+          severity: "需关注",
+          detail: "一般现在时和一般过去时的区分仍有混淆，需要加强时态练习。",
+          suggestions: ["整理时态对比表格", "每天做3道时态选择题"],
+        },
+      ],
+      weak_points: ["集合的交集概念", "看图写话的完整性", "英语一般过去时"],
+      trend_description: "整体呈进步趋势，最近一周做对率从60%提升到75%，数学进步最为明显。",
+      overall_suggestions: [
+        { priority: "high", content: "每天花15分钟专项练习语文看图写话" },
+        { priority: "medium", content: "整理英语时态笔记，做对比练习" },
+        { priority: "low", content: "保持数学每日练习的好习惯" },
+      ],
+      encouragement: "你最近的进步很大，特别是数学方面！继续保持这样的学习劲头，语文和英语也会慢慢提高的，加油！",
+    },
+  };
+}
+
 export function resetStudentDemoData() {
   localStorage.removeItem(DEMO_DB_KEY);
 }

@@ -293,3 +293,59 @@ export async function studentLogin(payload) {
     body: JSON.stringify(payload),
   });
 }
+
+// ---- 举一反三 ----
+export async function generateVariantsForQuestion(wrongQuestionId, count = 3) {
+  return requestJson("/api/variants/generate-for-question", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ wrong_question_id: wrongQuestionId, count }),
+  });
+}
+
+// ---- 趋势分析 ----
+export async function createTrendAnalysis(payload) {
+  return requestJson("/api/analysis/trend", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getTrendAnalysis(id) {
+  return requestJson(`/api/analysis/trend/${id}`);
+}
+
+export async function getLatestTrendAnalysis(studentId) {
+  return requestJson(`/api/analysis/trend/latest?student_id=${studentId}`);
+}
+
+export async function listTrendAnalyses(studentId) {
+  return requestJson(`/api/analysis/trend?student_id=${studentId}`);
+}
+
+// ---- Admin: Agent 配置管理 ----
+
+export async function listAgents() {
+  return requestJson("/api/admin/agents");
+}
+
+export async function getAgent(nodeName) {
+  return requestJson(`/api/admin/agents/${nodeName}`);
+}
+
+export async function updateAgent(nodeName, payload) {
+  return requestJson(`/api/admin/agents/${nodeName}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function testAgent(nodeName, payload = {}) {
+  return requestJson(`/api/admin/agents/${nodeName}/test`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
