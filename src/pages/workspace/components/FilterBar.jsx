@@ -1,74 +1,93 @@
-export default function FilterBar({ filters, setFilters, filterSubjectOptions, filterTermOptions }) {
+import { useEffect } from "react";
+
+export default function FilterBar({ filters, setFilters, filterSubjectOptions, filterTermOptions, defaultTerm }) {
+  // Set default term on first load when options arrive
+  useEffect(() => {
+    if (!filters.term && defaultTerm && filterTermOptions.includes(defaultTerm)) {
+      setFilters((prev) => ({ ...prev, term: defaultTerm }));
+    }
+  }, [defaultTerm, filterTermOptions.join(",")]);
+
+  const statusOptions = [
+    { value: "", label: "全部" },
+    { value: "new", label: "未掌握" },
+    { value: "mastered", label: "已掌握" },
+  ];
+
   return (
-    <>
-      <div className="student-filter-block">
-        <span className="student-filter-label">按学科筛选</span>
-        <div className="student-filter-tabs">
+    <div className="mb-4 space-y-3">
+      {/* Segmented Control: 掌握状态 */}
+      <div
+        className="flex rounded-xl p-1"
+        style={{ background: "rgba(99,102,241,0.08)" }}
+      >
+        {statusOptions.map((opt) => (
           <button
+            key={opt.value}
             type="button"
-            className={`student-filter-tab subject ${filters.subject === "" ? "active" : ""}`}
-            onClick={() => setFilters((prev) => ({ ...prev, subject: "" }))}
+            className="flex-1 rounded-lg py-1.5 text-[13px] font-semibold transition-all"
+            style={
+              filters.status === opt.value
+                ? { background: "#6366F1", color: "#fff", boxShadow: "0 2px 6px rgba(99,102,241,0.3)" }
+                : { background: "transparent", color: "#6B7280" }
+            }
+            onClick={() => setFilters((prev) => ({ ...prev, status: opt.value }))}
           >
-            全部学科
+            {opt.label}
           </button>
-          {filterSubjectOptions.map((subject) => (
-            <button
-              key={subject}
-              type="button"
-              className={`student-filter-tab subject ${filters.subject === subject ? "active" : ""}`}
-              onClick={() => setFilters((prev) => ({ ...prev, subject }))}
-            >
-              {subject}
-            </button>
-          ))}
-        </div>
+        ))}
       </div>
 
-      <div className="student-filter-block">
-        <span className="student-filter-label">按学期筛选</span>
-        <div className="student-filter-tabs">
-          <button
-            type="button"
-            className={`student-filter-tab term ${filters.term === "" ? "active" : ""}`}
-            onClick={() => setFilters((prev) => ({ ...prev, term: "" }))}
-          >
-            全部学期
-          </button>
-          {filterTermOptions.map((term) => (
-            <button
-              key={term}
-              type="button"
-              className={`student-filter-tab term ${filters.term === term ? "active" : ""}`}
-              onClick={() => setFilters((prev) => ({ ...prev, term }))}
-            >
-              {term}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="workspace-form student-filter-grid">
-        <label>
-          关键词
-          <input
-            placeholder="标题 / 内容 / 错误原因"
-            value={filters.keyword}
-            onChange={(event) => setFilters((prev) => ({ ...prev, keyword: event.target.value }))}
-          />
-        </label>
-        <label>
-          状态
+      {/* Dropdowns Row */}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
           <select
-            value={filters.status}
-            onChange={(event) => setFilters((prev) => ({ ...prev, status: event.target.value }))}
+            className="w-full appearance-none rounded-xl border border-gray-200 bg-white py-2 pl-3 pr-7 text-[13px] font-medium text-gray-700 outline-none"
+            style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}
+            value={filters.subject}
+            onChange={(e) => setFilters((prev) => ({ ...prev, subject: e.target.value }))}
           >
-            <option value="">全部</option>
-            <option value="new">新错题</option>
-            <option value="reviewing">复习中</option>
-            <option value="mastered">已掌握</option>
+            <option value="">全部学科</option>
+            {filterSubjectOptions.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
           </select>
-        </label>
+          <svg className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+          </svg>
+        </div>
+
+        <div className="relative flex-1">
+          <select
+            className="w-full appearance-none rounded-xl border border-gray-200 bg-white py-2 pl-3 pr-7 text-[13px] font-medium text-gray-700 outline-none"
+            style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}
+            value={filters.term}
+            onChange={(e) => setFilters((prev) => ({ ...prev, term: e.target.value }))}
+          >
+            <option value="">全部学期</option>
+            {filterTermOptions.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+          <svg className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+          </svg>
+        </div>
       </div>
-    </>
+
+      {/* Keyword search */}
+      <div className="relative">
+        <svg className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+        <input
+          className="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-[13px] text-gray-700 outline-none"
+          style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}
+          placeholder="搜索标题 / 内容 / 错误原因"
+          value={filters.keyword}
+          onChange={(e) => setFilters((prev) => ({ ...prev, keyword: e.target.value }))}
+        />
+      </div>
+    </div>
   );
 }

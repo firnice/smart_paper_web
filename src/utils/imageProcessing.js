@@ -605,7 +605,7 @@ export async function eraseSelectedElements(imageUrl, elements, hiddenIds, optio
   if (mode === "handwriting" && totalTextInk > 0) {
     const riskyRatio = erasedTextInk / totalTextInk;
     if (riskyRatio > 0.08) {
-      throw new Error("自动去手写触发保护：疑似会误删题干，请改用"背景置白 + 手动框选"");
+      throw new Error('自动去手写触发保护：疑似会误删题干，请改用"背景置白 + 手动框选"');
     }
   }
 

@@ -1,71 +1,58 @@
 import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { SquarePen, User, Plus } from "lucide-react";
-
-const NAV_ITEMS = [
-  { path: "/workspace", icon: SquarePen, label: "工作台" },
-  { path: "/mine", icon: User, label: "我的" },
-];
+import { LayoutDashboard, Camera, User } from "lucide-react";
 
 export default function AppFrameLayout() {
   const location = useLocation();
   const navigate = useNavigate();
 
+  const workspaceActive = location.pathname.startsWith("/workspace");
+  const mineActive = location.pathname.startsWith("/mine");
+
   return (
-    <div className="flex h-screen flex-col bg-[#F8F9FA]">
-      <main className="flex-1 overflow-auto pb-20">
-        <div className="p-4">
+    <div className="flex h-screen flex-col bg-[#F4F5F7]">
+      <main className="flex-1 overflow-auto pb-[72px]">
+        <div className="mx-auto max-w-[430px] px-4 pt-4 pb-2">
           <Outlet />
         </div>
       </main>
 
-      <nav className="safe-area-inset-bottom fixed right-0 bottom-0 left-0 z-50 border-t border-gray-200 bg-white">
-        <div className="flex items-center justify-around px-2 py-2">
-          {/* 工作台 tab */}
-          {(() => {
-            const item = NAV_ITEMS[0];
-            const isActive = location.pathname.startsWith(item.path);
-            const Icon = item.icon;
-            return (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                className="flex flex-1 flex-col items-center justify-center gap-1 py-2"
-              >
-                <Icon className={`h-6 w-6 ${isActive ? "text-indigo-600" : "text-gray-400"}`} />
-                <span className={`text-xs ${isActive ? "font-medium text-indigo-600" : "text-gray-500"}`}>
-                  {item.label}
-                </span>
-              </NavLink>
-            );
-          })()}
-
-          {/* 中央 FAB 录入按钮 */}
-          <button
-            type="button"
-            className="flex h-14 w-14 -translate-y-3 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 shadow-lg shadow-indigo-300/40 transition active:scale-95"
-            onClick={() => navigate("/workspace", { state: { openComposer: true } })}
+      {/* Bottom Navigation Bar */}
+      <nav className="safe-area-inset-bottom fixed right-0 bottom-0 left-0 z-50 bg-white" style={{ boxShadow: "0 -1px 0 rgba(0,0,0,0.06), 0 -4px 12px rgba(0,0,0,0.04)" }}>
+        <div className="mx-auto flex max-w-[430px] items-end justify-around px-4 pb-2 pt-1">
+          {/* 工作台 */}
+          <NavLink
+            to="/workspace"
+            className="flex flex-1 flex-col items-center justify-center gap-1 py-2"
           >
-            <Plus className="h-7 w-7 text-white" strokeWidth={2.5} />
-          </button>
+            <LayoutDashboard className={`h-6 w-6 ${workspaceActive ? "text-indigo-600" : "text-gray-400"}`} />
+            <span className={`text-[11px] font-medium ${workspaceActive ? "text-indigo-600" : "text-gray-400"}`}>
+              工作台
+            </span>
+          </NavLink>
 
-          {/* 我的 tab */}
-          {(() => {
-            const item = NAV_ITEMS[1];
-            const isActive = location.pathname.startsWith(item.path);
-            const Icon = item.icon;
-            return (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                className="flex flex-1 flex-col items-center justify-center gap-1 py-2"
-              >
-                <Icon className={`h-6 w-6 ${isActive ? "text-indigo-600" : "text-gray-400"}`} />
-                <span className={`text-xs ${isActive ? "font-medium text-indigo-600" : "text-gray-500"}`}>
-                  {item.label}
-                </span>
-              </NavLink>
-            );
-          })()}
+          {/* 中央 Camera FAB */}
+          <div className="flex flex-1 flex-col items-center justify-end pb-1">
+            <button
+              type="button"
+              className="flex h-[56px] w-[56px] -translate-y-4 items-center justify-center rounded-full transition active:scale-95"
+              style={{ background: "linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)", boxShadow: "0 4px 16px rgba(99,102,241,0.45), 0 2px 6px rgba(0,0,0,0.12)" }}
+              onClick={() => navigate("/workspace", { state: { openComposer: true } })}
+            >
+              <Camera className="h-6 w-6 text-white" strokeWidth={2} />
+            </button>
+            <span className="mt-[-10px] text-[11px] font-medium text-indigo-500">拍照</span>
+          </div>
+
+          {/* 我的 */}
+          <NavLink
+            to="/mine"
+            className="flex flex-1 flex-col items-center justify-center gap-1 py-2"
+          >
+            <User className={`h-6 w-6 ${mineActive ? "text-indigo-600" : "text-gray-400"}`} />
+            <span className={`text-[11px] font-medium ${mineActive ? "text-indigo-600" : "text-gray-400"}`}>
+              我的
+            </span>
+          </NavLink>
         </div>
       </nav>
     </div>

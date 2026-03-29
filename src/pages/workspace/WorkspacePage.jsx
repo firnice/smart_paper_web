@@ -1,13 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { getDefaultSchoolTerm, getTermOptions, demoTrendAnalysis } from "../../services/studentDemo.js";
+import { getDefaultSchoolTerm, getTermOptions } from "../../services/studentDemo.js";
 import {
   createStudyRecord,
-  createTrendAnalysis,
   deleteWrongQuestion,
-  getLatestTrendAnalysis,
   getStatisticsOverview,
-  getTrendAnalysis,
   listErrorReasons,
   listStudyRecords,
   listSubjects,
@@ -20,7 +17,6 @@ import { DEFAULT_SUBJECT_OPTIONS, EDIT_INITIAL, STATUS_LABEL } from "./constants
 import { buildStats, mapWrongQuestionItem } from "./mappers.js";
 import useComposer from "./hooks/useComposer.js";
 import StatsBar from "./components/StatsBar.jsx";
-import TrendAnalysisSection from "./components/TrendAnalysisSection.jsx";
 import QuestionList from "./components/QuestionList.jsx";
 import EditModal from "./components/EditModal.jsx";
 import ComposerModal from "./components/ComposerModal.jsx";
@@ -44,11 +40,6 @@ export default function WorkspacePage() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  // AI 学习趋势分析
-  const [trendAnalysis, setTrendAnalysis] = useState(null);
-  const [trendLoading, setTrendLoading] = useState(false);
-  const [trendError, setTrendError] = useState("");
 
   const studentId = session?.student?.id;
   const profile = session?.student?.student_profile || {};
@@ -146,66 +137,6 @@ export default function WorkspacePage() {
       window.history.replaceState({}, "");
     }
   }, [location.state?.openComposer]);
-
-  // 加载最新的趋势分析
-  useEffect(() => {
-    if (!studentId) return;
-    getLatestTrendAnalysis(studentId)
-      .then((data) => {
-        if (data && data.status === "completed") {
-          setTrendAnalysis(data);
-        }
-      })
-      .catch(() => {});
-  }, [studentId]);
-
-  const onGenerateTrendAnalysis = useCallback(async () => {
-    if (!studentId || trendLoading) return;
-    setTrendLoading(true);
-    setTrendError("");
-    try {
-      const created = await createTrendAnalysis({ student_id: studentId });
-      const analysisId = created?.id;
-      if (!analysisId) throw new Error("未能创建分析任务");
-
-      let attempts = 0;
-      const maxAttempts = 30;
-      const poll = () =>
-        new Promise((resolve, reject) => {
-          const interval = setInterval(async () => {
-            attempts += 1;
-            try {
-              const result = await getTrendAnalysis(analysisId);
-              if (result?.status === "completed") {
-                clearInterval(interval);
-                resolve(result);
-              } else if (result?.status === "failed") {
-                clearInterval(interval);
-                reject(new Error("分析失败，请稍后重试"));
-              } else if (attempts >= maxAttempts) {
-                clearInterval(interval);
-                reject(new Error("分析超时，请稍后查看结果"));
-              }
-            } catch (err) {
-              clearInterval(interval);
-              reject(err);
-            }
-          }, 2000);
-        });
-
-      const finalResult = await poll();
-      setTrendAnalysis(finalResult);
-    } catch (err) {
-      try {
-        const demoResult = demoTrendAnalysis(studentId);
-        setTrendAnalysis(demoResult);
-      } catch {
-        setTrendError(err?.message || "生成分析报告失败");
-      }
-    } finally {
-      setTrendLoading(false);
-    }
-  }, [studentId, trendLoading]);
 
   const onChangeStatus = async (wrongQuestionId, status) => {
     if (!studentId) return;
@@ -309,30 +240,32 @@ export default function WorkspacePage() {
   const filterSubjectOptions = Array.from(
     new Set([...DEFAULT_SUBJECT_OPTIONS, ...subjectOptions, composer.form.subject].filter(Boolean)),
   );
-  const filterTermOptions = Array.from(
-    new Set([...gradeTermOptions, ...termOptions, composer.form.term].filter(Boolean)),
-  );
+  // Only show terms that actually have questions (termOptions comes from loaded wrong questions)
+  const filterTermOptions = Array.from(new Set(termOptions.filter(Boolean)));
 
   return (
-    <div className="page student-dashboard-page">
-      <header className="hero student-hero">
-        <div className="hero-tag">学生工作台</div>
-        <h1>{student.name} 的错题工作台</h1>
-        <p>年级：{profile.grade || "-"} · 学号：{profile.student_no || "-"} · 在这里处理录入、识别、精修与维护</p>
+    <div className="pb-4">
+      {/* Page Header */}
+      <header className="mb-4 flex items-center justify-between">
+        <div>
+          <h1 className="text-[20px] font-bold leading-tight text-gray-900">{student.name} 的错题本</h1>
+          <p className="mt-0.5 text-[12px] text-gray-400">{profile.grade || ""} · 学号 {profile.student_no || "-"}</p>
+        </div>
+        <button
+          type="button"
+          className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-[13px] font-bold text-white transition active:scale-95"
+          style={{ background: "linear-gradient(135deg, #6366F1, #8B5CF6)", boxShadow: "0 2px 10px rgba(99,102,241,0.35)" }}
+          onClick={composer.onOpenComposer}
+        >
+          + 添加
+        </button>
       </header>
 
-      {notice && <div className="workspace-alert ok">{notice}</div>}
-      {error && <div className="workspace-alert error">{error}</div>}
-      {loading && <div className="workspace-alert">处理中...</div>}
+      {notice && <div className="workspace-alert ok mb-3">{notice}</div>}
+      {error && <div className="workspace-alert error mb-3">{error}</div>}
+      {loading && <div className="workspace-alert mb-3">处理中...</div>}
 
-      <StatsBar stats={stats} onOpenComposer={composer.onOpenComposer} />
-
-      <TrendAnalysisSection
-        trendAnalysis={trendAnalysis}
-        trendLoading={trendLoading}
-        trendError={trendError}
-        onGenerateTrendAnalysis={onGenerateTrendAnalysis}
-      />
+      <StatsBar stats={stats} />
 
       <QuestionList
         wrongQuestions={wrongQuestions}
@@ -342,6 +275,7 @@ export default function WorkspacePage() {
         setFilters={setFilters}
         filterSubjectOptions={filterSubjectOptions}
         filterTermOptions={filterTermOptions}
+        defaultTerm={getDefaultSchoolTerm(null, profile.grade)}
         onPractice={onPractice}
         onChangeStatus={onChangeStatus}
         onToggleBookmark={onToggleBookmark}

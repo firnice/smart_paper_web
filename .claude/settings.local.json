@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(update-config)",
+      "Bash(npm list:*)",
+      "Bash(claude mcp:*)",
+      "mcp__figma__get_figma_data",
+      "Bash(npm run:*)"
+    ]
+  }
+}

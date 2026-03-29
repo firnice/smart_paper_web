@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { LineChart, LogOut } from "lucide-react";
+import { LogOut, TrendingUp, ChevronRight, Bell, BarChart2 } from "lucide-react";
 import { getStatisticsOverview, listWrongQuestions } from "../../services/api.js";
 import { clearStudentSession, readStudentSession } from "../../utils/studentSession.js";
 import UserHeader from "./components/UserHeader.jsx";
@@ -11,7 +11,7 @@ function formatDateLabel(value) {
   if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return `${date.getMonth() + 1}-${date.getDate()}`;
+  return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 
 function mapQuestion(item) {
@@ -19,18 +19,15 @@ function mapQuestion(item) {
   return {
     id: item.id,
     title: item.title || "未命名错题",
-    subject: item.subject?.name || "未分类学科",
+    subject: item.subject?.name || "未分类",
     updatedAt: item.updated_at || item.created_at || "",
     status: item.status || "new",
-    errorReason: reasons.map((reason) => reason.name).filter(Boolean).join(" / ") || "待分析",
+    errorReason: reasons.map((r) => r.name).filter(Boolean).join(" / ") || "待分析",
   };
 }
 
-const STATUS_TEXT = {
-  new: "新错题",
-  reviewing: "复习中",
-  mastered: "已掌握",
-};
+const STATUS_TEXT = { new: "新错题", reviewing: "复习中", mastered: "已掌握" };
+const STATUS_COLOR = { new: "#EF4444", reviewing: "#F59E0B", mastered: "#10B981" };
 
 export default function MinePage() {
   const navigate = useNavigate();
@@ -46,11 +43,8 @@ export default function MinePage() {
 
   useEffect(() => {
     if (!studentId) return;
-
     let active = true;
     setLoading(true);
-    setError("");
-
     Promise.all([
       getStatisticsOverview(studentId),
       listWrongQuestions({ student_id: studentId, limit: 6 }),
@@ -60,18 +54,9 @@ export default function MinePage() {
         setStats(statsRes || null);
         setQuestions((wrongRes?.items || []).map(mapQuestion));
       })
-      .catch((err) => {
-        if (!active) return;
-        setError(err?.message || "我的页面加载失败");
-      })
-      .finally(() => {
-        if (!active) return;
-        setLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
+      .catch((err) => { if (active) setError(err?.message || "加载失败"); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, [studentId]);
 
   const masteryRate = useMemo(() => {
@@ -96,7 +81,7 @@ export default function MinePage() {
       const total = Number(item.total || 0);
       const mastered = Number(item.mastered || 0);
       return {
-        subject: item.subject_name || "未分类学科",
+        subject: item.subject_name || "未分类",
         total,
         mastered,
         progress: total > 0 ? Math.round((mastered / total) * 100) : 0,
@@ -111,78 +96,128 @@ export default function MinePage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 pb-4">
+    <div className="space-y-4 pb-4">
+      {/* User Profile Header */}
       <UserHeader student={student} profile={profile} />
 
-      {error ? <div className="workspace-alert error">{error}</div> : null}
+      {error && <div className="rounded-xl bg-red-50 px-3 py-2 text-[13px] text-red-600">{error}</div>}
 
+      {/* Stats Overview */}
       <StatsOverview stats={stats} masteryRate={masteryRate} loading={loading} />
 
-      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-        <h2 className="mb-4 flex items-center gap-2 font-semibold text-gray-900">
-          <LineChart className="h-5 w-5 text-indigo-600" />
-          最近 7 次学习趋势
-        </h2>
+      {/* Subject Distribution */}
+      {topSubjects.length > 0 && <SubjectChart topSubjects={topSubjects} />}
 
+      {/* Mastery Trend - 7 days */}
+      <div
+        className="rounded-2xl bg-white px-4 py-4"
+        style={{ boxShadow: "0 2px 10px rgba(0,0,0,0.06)", border: "1px solid rgba(0,0,0,0.04)" }}
+      >
+        <div className="mb-3 flex items-center gap-2">
+          <TrendingUp className="h-4 w-4 text-indigo-500" />
+          <h2 className="text-[14px] font-bold text-gray-800">掌握趋势</h2>
+        </div>
         {recentTrend.length ? (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {recentTrend.map((item) => (
-              <div key={`${item.date}-${item.total}`} className="rounded-xl bg-gray-50 p-3">
-                <div className="mb-2 flex items-center justify-between text-sm">
-                  <span className="font-medium text-gray-700">{item.date}</span>
-                  <span className="text-gray-500">共 {item.total} 次</span>
+              <div key={`${item.date}-${item.total}`} className="flex items-center gap-3">
+                <span className="w-10 text-[11px] text-gray-400">{item.date}</span>
+                <div className="flex flex-1 items-center gap-1.5">
+                  {item.correct > 0 && (
+                    <div
+                      className="flex h-5 items-center justify-center rounded-md text-[10px] font-bold text-white"
+                      style={{ background: "#10B981", width: `${Math.max(24, (item.correct / Math.max(item.total, 1)) * 80)}%` }}
+                    >
+                      {item.correct}
+                    </div>
+                  )}
+                  {item.incorrect > 0 && (
+                    <div
+                      className="flex h-5 items-center justify-center rounded-md text-[10px] font-bold text-white"
+                      style={{ background: "#EF4444", width: `${Math.max(24, (item.incorrect / Math.max(item.total, 1)) * 80)}%` }}
+                    >
+                      {item.incorrect}
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center gap-3 text-xs">
-                  <span className="rounded bg-emerald-50 px-2 py-1 font-medium text-emerald-700">做对 {item.correct}</span>
-                  <span className="rounded bg-rose-50 px-2 py-1 font-medium text-rose-700">做错 {item.incorrect}</span>
-                </div>
+                <span className="w-8 text-right text-[11px] text-gray-400">{item.total}</span>
               </div>
             ))}
+            <div className="mt-3 flex items-center gap-4 text-[11px] text-gray-400">
+              <span className="flex items-center gap-1.5"><span className="inline-block h-2 w-4 rounded-sm bg-emerald-400" />做对</span>
+              <span className="flex items-center gap-1.5"><span className="inline-block h-2 w-4 rounded-sm bg-red-400" />做错</span>
+            </div>
           </div>
         ) : (
-          <div className="rounded-xl bg-gray-50 p-4 text-sm text-gray-500">还没有学习记录，先去工作台录入或练习一次。</div>
+          <p className="text-[13px] text-gray-400">还没有学习记录</p>
         )}
       </div>
 
-      <SubjectChart topSubjects={topSubjects} />
+      {/* Menu Items */}
+      <div
+        className="overflow-hidden rounded-2xl bg-white"
+        style={{ boxShadow: "0 2px 10px rgba(0,0,0,0.06)", border: "1px solid rgba(0,0,0,0.04)" }}
+      >
+        {[
+          { Icon: Bell, label: "消息通知", badge: true },
+          { Icon: BarChart2, label: "趋势分析导出" },
+        ].map(({ Icon, label, badge }, idx) => (
+          <div
+            key={label}
+            className={`flex items-center gap-3 px-4 py-3.5 ${idx > 0 ? "border-t border-gray-50" : ""}`}
+          >
+            <Icon className="h-4.5 w-4.5 text-gray-400" />
+            <span className="flex-1 text-[14px] font-medium text-gray-700">{label}</span>
+            {badge && (
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">1</span>
+            )}
+            <ChevronRight className="h-4 w-4 text-gray-300" />
+          </div>
+        ))}
+      </div>
 
-      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="font-semibold text-gray-900">最近错题</h2>
-          <Link to="/workspace" className="text-sm font-medium text-indigo-600">
-            去工作台
-          </Link>
-        </div>
-
-        {recentQuestions.length ? (
-          <div className="space-y-3">
+      {/* Recent Questions */}
+      {recentQuestions.length > 0 && (
+        <div
+          className="rounded-2xl bg-white px-4 py-4"
+          style={{ boxShadow: "0 2px 10px rgba(0,0,0,0.06)", border: "1px solid rgba(0,0,0,0.04)" }}
+        >
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-[14px] font-bold text-gray-800">最近错题</h2>
+            <Link to="/workspace" className="text-[12px] font-medium text-indigo-500">全部 →</Link>
+          </div>
+          <div className="space-y-2">
             {recentQuestions.map((item) => (
               <Link
                 key={item.id}
                 to={`/question/${item.id}`}
-                className="block rounded-xl border border-gray-100 bg-gray-50 p-4 transition hover:border-indigo-200 hover:bg-white"
+                className="flex items-center gap-3 rounded-xl bg-gray-50 px-3 py-2.5 transition active:bg-gray-100"
               >
-                <div className="mb-2 flex items-start justify-between gap-3">
-                  <span className="rounded-lg bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-600">{item.subject}</span>
-                  <span className="text-xs text-gray-400">{formatDateLabel(item.updatedAt)}</span>
-                </div>
-                <p className="mb-1 text-sm font-semibold text-gray-900">{item.title}</p>
-                <p className="text-xs text-gray-500">状态：{STATUS_TEXT[item.status] || item.status} · 错因：{item.errorReason}</p>
+                <span
+                  className="rounded-lg px-2 py-1 text-[11px] font-bold"
+                  style={{ background: "#EEF2FF", color: "#6366F1" }}
+                >
+                  {item.subject}
+                </span>
+                <p className="flex-1 truncate text-[13px] font-medium text-gray-800">{item.title}</p>
+                <span
+                  className="text-[10px] font-bold"
+                  style={{ color: STATUS_COLOR[item.status] || "#6B7280" }}
+                >
+                  {STATUS_TEXT[item.status] || item.status}
+                </span>
               </Link>
             ))}
           </div>
-        ) : (
-          <div className="rounded-xl bg-gray-50 p-4 text-sm text-gray-500">还没有错题，先去工作台录入第一道题。</div>
-        )}
-      </div>
+        </div>
+      )}
 
+      {/* Logout */}
       <button
         type="button"
-        onClick={() => {
-          clearStudentSession();
-          navigate("/student/login");
-        }}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white py-3 text-sm font-medium text-red-500 shadow-sm transition active:scale-[0.98]"
+        onClick={() => { clearStudentSession(); navigate("/student/login"); }}
+        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white py-3.5 text-[14px] font-semibold text-red-500 transition active:scale-[0.98]"
+        style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}
       >
         <LogOut className="h-4 w-4" />
         退出登录

@@ -1001,7 +1001,7 @@ export default function useComposer({ studentId, profile, subjectOptions, catego
         hiddenIds: [...editorPrev.hiddenIds, newId],
       };
     });
-    setSuccess("已新增删除框，点击"应用删除到图片"后生效");
+    setSuccess('已新增删除框，点击"应用删除到图片"后生效');
   };
 
   const canRunRecognition = Boolean(
