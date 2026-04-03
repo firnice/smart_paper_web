@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Printer, CheckCircle2, ChevronDown } from "lucide-react";
+import { CheckCircle2, ChevronDown, Printer } from "lucide-react";
 import { createExport, listWrongQuestions, resolveAssetUrl } from "../services/api.js";
 import { readStudentSession } from "../utils/studentSession.js";
 import { getDefaultSchoolTerm } from "../services/studentDemo.js";
@@ -30,6 +30,21 @@ function mapQuestion(item) {
     updatedAt: item.updated_at || item.created_at || "",
     term: inferTerm(item.first_error_date || item.created_at, item.grade),
   };
+}
+
+function SummaryRow({ label, value, tone = "default" }) {
+  const toneClass = tone === "accent"
+    ? "bg-indigo-50 text-indigo-700"
+    : tone === "success"
+      ? "bg-emerald-50 text-emerald-700"
+      : "bg-slate-50 text-slate-700";
+
+  return (
+    <div className={`flex items-center justify-between rounded-2xl px-3 py-3 text-sm ${toneClass}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
 }
 
 export default function PrintPage() {
@@ -131,9 +146,9 @@ export default function PrintPage() {
     return (
       <div className="mx-auto max-w-2xl space-y-4 pb-4 pt-6">
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          请先登录学生端，再生成重做打印包。
+          请先登录家庭入口，再生成重做打印包。
         </div>
-        <button onClick={() => navigate("/student/login")} className="btn-primary">
+        <button onClick={() => navigate("/login")} className="btn-primary">
           去登录
         </button>
       </div>
@@ -141,142 +156,164 @@ export default function PrintPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 pb-4">
+    <div className="mx-auto max-w-7xl space-y-6 pb-4">
       <div className="pt-2 pb-2">
-        <h1 className="text-2xl font-bold text-gray-900">打印重做包</h1>
-        <p className="mt-1 text-sm text-gray-500">主流程按“选错题 → 打印 → 线下重做 → 回填结果”设计</p>
+        <h1 className="text-3xl font-black tracking-tight text-gray-900">打印重做包</h1>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-500">
+          录入、整理和打印共用一套错题数据。手机上选题也没问题，但电脑端更适合同时看题目、设置排版和直接导出 PDF。
+        </p>
       </div>
 
       {error ? <div className="workspace-alert error">{error}</div> : null}
       {loading ? <div className="workspace-alert">正在加载真实错题...</div> : null}
 
-      <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-        <div className="mb-3 flex items-center justify-between">
-          <span className="text-sm font-medium text-gray-900">选择进入重做包的错题</span>
-          <span className="text-sm text-gray-500">已选 {selectedQuestions.length} 题</span>
-        </div>
-        <div className="space-y-2">
-          {questions.length === 0 ? (
-            <div className="rounded-xl bg-gray-50 p-3 text-sm text-gray-500">当前还没有可打印的真实错题。</div>
-          ) : (
-            questions.map((question, index) => {
-              const checked = selectedIds.includes(question.id);
-              return (
-                <label key={question.id} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 ${checked ? "border-indigo-300 bg-indigo-50" : "border-gray-200 bg-gray-50"}`}>
-                  <input type="checkbox" checked={checked} onChange={() => toggleQuestion(question.id)} className="mt-1" />
-                  <span className="mt-0.5 text-xs font-medium text-gray-500">{index + 1}.</span>
-                  <div className="min-w-0 flex-1">
-                    <div className="mb-1 flex flex-wrap items-center gap-2">
-                      <span className="rounded bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-600">{question.subject}</span>
-                      <span className="text-xs text-gray-500">{question.term || "未分期"}</span>
-                      <span className="text-xs text-gray-500">{question.category}</span>
-                    </div>
-                    <p className="text-sm font-medium text-gray-900">{question.title}</p>
-                    {question.imageUrl ? (
-                      <div className="mt-2 overflow-hidden rounded-xl border border-gray-100 bg-white">
-                        <img src={question.imageUrl} alt={question.imageName || question.title} className="max-h-44 w-full object-contain" />
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <section className="space-y-6">
+          <div className="rounded-3xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-sm font-medium text-gray-900">选择进入重做包的错题</span>
+              <span className="text-sm text-gray-500">已选 {selectedQuestions.length} 题</span>
+            </div>
+            <div className="space-y-2">
+              {questions.length === 0 ? (
+                <div className="rounded-2xl bg-gray-50 p-4 text-sm text-gray-500">当前还没有可打印的真实错题。</div>
+              ) : (
+                questions.map((question, index) => {
+                  const checked = selectedIds.includes(question.id);
+                  return (
+                    <label
+                      key={question.id}
+                      className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-3 transition ${
+                        checked ? "border-indigo-300 bg-indigo-50" : "border-gray-200 bg-gray-50"
+                      }`}
+                    >
+                      <input type="checkbox" checked={checked} onChange={() => toggleQuestion(question.id)} className="mt-1" />
+                      <span className="mt-0.5 text-xs font-medium text-gray-500">{index + 1}.</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-1 flex flex-wrap items-center gap-2">
+                          <span className="rounded bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-600">{question.subject}</span>
+                          <span className="text-xs text-gray-500">{question.term || "未分期"}</span>
+                          <span className="text-xs text-gray-500">{question.category}</span>
+                        </div>
+                        <p className="text-sm font-medium text-gray-900">{question.title}</p>
+                        {question.imageUrl ? (
+                          <div className="mt-2 overflow-hidden rounded-xl border border-gray-100 bg-white">
+                            <img src={question.imageUrl} alt={question.imageName || question.title} className="max-h-56 w-full object-contain" />
+                          </div>
+                        ) : null}
+                        <p className="mt-1 line-clamp-2 text-sm text-gray-700">{question.content}</p>
                       </div>
-                    ) : null}
-                    <p className="mt-1 line-clamp-2 text-sm text-gray-700">{question.content}</p>
-                  </div>
-                </label>
-              );
-            })
-          )}
-        </div>
-      </div>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+          </div>
 
-      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-        <h3 className="mb-4 text-sm font-semibold text-gray-900">选择打印模式</h3>
-        <div className="space-y-2">
-          {resolvedModes.map((item) => (
-            <div
-              key={item.id}
-              onClick={() => setMode(item.id)}
-              className={`cursor-pointer rounded-xl border-2 p-4 transition-all ${
-                mode === item.id ? "border-indigo-600 bg-indigo-50" : "border-gray-200 bg-white hover:border-indigo-200"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
+          <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4">
+            <p className="text-sm leading-6 text-amber-800">
+              当前导出已经会调用真实后端生成 PDF。完成后可直接打开文件，也可以顺手去回填这批题目的线下重做结果。
+            </p>
+          </div>
+        </section>
+
+        <aside className="space-y-4 xl:sticky xl:top-8 xl:self-start">
+          <section className="rounded-3xl border border-slate-900 bg-slate-900 p-5 text-white shadow-[0_18px_36px_rgba(15,23,42,0.18)]">
+            <h2 className="text-lg font-bold">排版工作区</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-300">
+              建议在电脑端完成最终排版和导出，边选题边预估打印包规模，减少来回切换。
+            </p>
+            <div className="mt-4 space-y-3">
+              <SummaryRow label="已选题目" value={`${selectedQuestions.length} 题`} tone="accent" />
+              <SummaryRow label="当前模式" value={currentMode.label} />
+              <SummaryRow label="答案显示" value={hideAnswers ? "隐藏参考答案" : "保留参考答案"} tone="success" />
+            </div>
+          </section>
+
+          <section className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm">
+            <h3 className="mb-4 text-sm font-semibold text-gray-900">选择打印模式</h3>
+            <div className="space-y-2">
+              {resolvedModes.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setMode(item.id)}
+                  className={`w-full rounded-2xl border-2 p-4 text-left transition-all ${
+                    mode === item.id ? "border-indigo-600 bg-indigo-50" : "border-gray-200 bg-white hover:border-indigo-200"
+                  }`}
+                >
                   <div className="mb-1 flex items-center gap-2">
                     <span className={`font-semibold ${mode === item.id ? "text-indigo-900" : "text-gray-900"}`}>{item.label}</span>
                     <span className="text-xs text-gray-500">{item.desc}</span>
                   </div>
                   <div className="text-sm text-gray-600">本次预计打印 {item.count} 道题</div>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <div className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
+            <button onClick={() => setShowSettings((value) => !value)} className="flex w-full items-center justify-between px-5 py-4">
+              <span className="text-sm font-medium text-gray-900">打印设置</span>
+              <ChevronDown className={`h-5 w-5 text-gray-400 transition-transform ${showSettings ? "rotate-180" : ""}`} />
+            </button>
+            {showSettings ? (
+              <div className="space-y-4 border-t border-gray-100 px-5 pt-4 pb-5">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-700">隐藏参考答案</span>
+                  <button
+                    onClick={() => setHideAnswers((value) => !value)}
+                    className={`relative h-6 w-12 rounded-full transition-colors ${hideAnswers ? "bg-indigo-600" : "bg-gray-300"}`}
+                  >
+                    <div className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${hideAnswers ? "left-6" : "left-0.5"}`} />
+                  </button>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </div>
+            ) : null}
+          </div>
 
-      <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-        <button onClick={() => setShowSettings((value) => !value)} className="flex w-full items-center justify-between px-5 py-4">
-          <span className="text-sm font-medium text-gray-900">打印设置</span>
-          <ChevronDown className={`h-5 w-5 text-gray-400 transition-transform ${showSettings ? "rotate-180" : ""}`} />
-        </button>
-        {showSettings ? (
-          <div className="space-y-4 border-t border-gray-100 px-5 pt-4 pb-5">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-700">隐藏参考答案</span>
-              <button
-                onClick={() => setHideAnswers((value) => !value)}
-                className={`relative h-6 w-12 rounded-full transition-colors ${hideAnswers ? "bg-indigo-600" : "bg-gray-300"}`}
-              >
-                <div className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${hideAnswers ? "left-6" : "left-0.5"}`} />
+          {!isDone ? (
+            <button
+              onClick={handleGenerate}
+              disabled={isGenerating || selectedQuestions.length === 0}
+              className="flex w-full items-center justify-center gap-2 rounded-3xl bg-indigo-600 py-4 font-semibold text-white shadow-lg transition-all hover:bg-indigo-700 disabled:bg-gray-400"
+            >
+              {isGenerating ? <span className="animate-pulse">正在准备打印包...</span> : <><Printer className="h-5 w-5" /> 生成打印重做包</>}
+            </button>
+          ) : (
+            <div className="space-y-3 rounded-3xl border border-gray-100 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-center gap-2 py-2 font-medium text-emerald-600">
+                <CheckCircle2 className="h-5 w-5" />
+                打印重做包已就绪
+              </div>
+              <button onClick={handlePrint} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-4 font-semibold text-white shadow-lg transition-all hover:bg-indigo-700">
+                <Printer className="h-5 w-5" />
+                {exportData?.download_url ? "下载 / 打开 PDF" : "立即打印"}
+              </button>
+              {exportData?.download_url ? (
+                <a
+                  href={exportData.download_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-full rounded-2xl border-2 border-gray-200 bg-white py-3 text-center font-medium text-gray-700 transition-all hover:bg-gray-50"
+                >
+                  打开导出文件
+                </a>
+              ) : null}
+              {selectedQuestions.length > 0 ? (
+                <button
+                  onClick={() => navigate(`/practice/${selectedQuestions[0].id}`)}
+                  className="w-full rounded-2xl border-2 border-indigo-200 bg-indigo-50 py-3 font-medium text-indigo-700 transition-all hover:bg-indigo-100"
+                >
+                  去回填第一道题的练习结果
+                </button>
+              ) : null}
+              <button onClick={() => setIsDone(false)} className="w-full rounded-2xl border-2 border-gray-200 bg-white py-3 font-medium text-gray-700 transition-all hover:bg-gray-50">
+                重新设置
               </button>
             </div>
-          </div>
-        ) : null}
-      </div>
-
-      {!isDone ? (
-        <button
-          onClick={handleGenerate}
-          disabled={isGenerating || selectedQuestions.length === 0}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-4 font-semibold text-white shadow-lg transition-all hover:bg-indigo-700 disabled:bg-gray-400"
-        >
-          {isGenerating ? <span className="animate-pulse">正在准备打印包...</span> : <><Printer className="h-5 w-5" /> 生成打印重做包</>}
-        </button>
-      ) : (
-        <div className="space-y-3">
-          <div className="flex items-center justify-center gap-2 py-2 font-medium text-emerald-600">
-            <CheckCircle2 className="h-5 w-5" />
-            打印重做包已就绪
-          </div>
-          <button onClick={handlePrint} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-4 font-semibold text-white shadow-lg transition-all hover:bg-indigo-700">
-            <Printer className="h-5 w-5" />
-            {exportData?.download_url ? "下载 / 打开 PDF" : "立即打印"}
-          </button>
-          {exportData?.download_url ? (
-            <a
-              href={exportData.download_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block w-full rounded-2xl border-2 border-gray-200 bg-white py-3 text-center font-medium text-gray-700 transition-all hover:bg-gray-50"
-            >
-              打开导出文件
-            </a>
-          ) : null}
-          {selectedQuestions.length > 0 ? (
-            <button
-              onClick={() => navigate(`/practice/${selectedQuestions[0].id}`)}
-              className="w-full rounded-2xl border-2 border-indigo-200 bg-indigo-50 py-3 font-medium text-indigo-700 transition-all hover:bg-indigo-100"
-            >
-              去回填第一道题的练习结果
-            </button>
-          ) : null}
-          <button onClick={() => setIsDone(false)} className="w-full rounded-2xl border-2 border-gray-200 bg-white py-3 font-medium text-gray-700 transition-all hover:bg-gray-50">
-            重新设置
-          </button>
-        </div>
-      )}
-
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-        <p className="text-sm text-amber-800">
-          现在这一步已经会调用真实导出接口生成 PDF；导出完成后也给出直接去结果回填的下一步入口，减少主链路中断。
-        </p>
+          )}
+        </aside>
       </div>
     </div>
   );

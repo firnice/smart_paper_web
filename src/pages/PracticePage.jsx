@@ -78,7 +78,7 @@ export default function PracticePage() {
     }
   };
 
-  if (!studentId) return <div className="workspace-alert error">请先登录学生端。</div>;
+  if (!studentId) return <div className="workspace-alert error">请先登录家庭入口。</div>;
   if (error && !question) return <div className="workspace-alert error">{error}</div>;
   if (!question) return <div className="workspace-alert">正在加载练习题...</div>;
 
@@ -95,7 +95,7 @@ export default function PracticePage() {
       <div className="pb-2 text-center">
         <h1 className="mb-2 text-2xl font-bold text-gray-900">错题结果回填</h1>
         <p className="text-sm text-gray-500">
-          针对 <span className="font-semibold text-indigo-600">{question.title}</span> 记录这次线下重做结果
+          针对 <span className="font-semibold text-indigo-600">{question.title}</span> 记录这次线下重做结果，便于家长继续筛题和打印下一轮练习
         </p>
         <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-sm font-medium text-indigo-700">
           <span>当前状态：{STATUS_LABEL[question.status] || question.status}</span>

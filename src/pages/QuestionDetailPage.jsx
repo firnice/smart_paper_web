@@ -44,7 +44,7 @@ export default function QuestionDetailPage() {
       .finally(() => setLoading(false));
   }, [studentId, id]);
 
-  if (!studentId) return <div className="workspace-alert error">请先登录学生端。</div>;
+  if (!studentId) return <div className="workspace-alert error">请先登录家庭入口。</div>;
   if (loading) return <div className="workspace-alert">正在加载错题详情...</div>;
   if (error) return <div className="workspace-alert error">{error}</div>;
   if (!question) return null;

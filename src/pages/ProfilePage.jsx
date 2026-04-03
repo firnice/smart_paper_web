@@ -109,7 +109,7 @@ export default function ProfilePage() {
   const recentQuestions = useMemo(() => questions.slice(0, 4), [questions]);
 
   if (!studentId) {
-    return <div className="workspace-alert error">请先登录学生端。</div>;
+    return <div className="workspace-alert error">请先登录家庭入口。</div>;
   }
 
   return (
@@ -117,8 +117,8 @@ export default function ProfilePage() {
       <div className="rounded-3xl bg-gradient-to-br from-indigo-600 to-violet-700 p-6 text-white shadow-lg">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-sm text-indigo-100">我的学习</p>
-            <h1 className="mt-1 text-3xl font-bold">{student?.name || "同学"}</h1>
+            <p className="text-sm text-indigo-100">家庭工作台</p>
+            <h1 className="mt-1 text-3xl font-bold">{student?.name || "已绑定孩子"}</h1>
             <p className="mt-2 text-sm text-indigo-100">
               年级：{profile.grade || "-"} · 学号：{profile.student_no || "-"}
             </p>
@@ -235,7 +235,7 @@ export default function ProfilePage() {
         <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="font-semibold text-gray-900">最近错题</h2>
           <Link to="/workspace" className="text-sm font-medium text-indigo-600">
-            去工作台
+            去错题本
           </Link>
         </div>
 
@@ -265,7 +265,7 @@ export default function ProfilePage() {
         type="button"
         onClick={() => {
           clearStudentSession();
-          navigate("/student/login");
+          navigate("/login");
         }}
         className="flex w-full items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white py-3 text-sm font-medium text-red-500 shadow-sm transition active:scale-[0.98]"
       >

@@ -16,8 +16,8 @@ export default function UserHeader({ student, profile }) {
         </div>
         {/* Info */}
         <div className="min-w-0">
-          <p className="text-[11px] text-white/70">我的学习档案</p>
-          <h1 className="mt-0.5 text-[20px] font-bold leading-tight">{student?.name || "同学"}</h1>
+          <p className="text-[11px] text-white/70">孩子学习概览</p>
+          <h1 className="mt-0.5 text-[20px] font-bold leading-tight">{student?.name || "已绑定孩子"}</h1>
           <p className="mt-1 text-[12px] text-white/80">
             {profile.grade || "—"} · {profile.school_name || "—"} · {profile.class_name || "—"}
           </p>

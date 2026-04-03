@@ -92,7 +92,7 @@ export default function MinePage() {
   const recentQuestions = useMemo(() => questions.slice(0, 4), [questions]);
 
   if (!studentId) {
-    return <div className="workspace-alert error">请先登录学生端。</div>;
+    return <div className="workspace-alert error">请先登录家庭入口。</div>;
   }
 
   return (
@@ -153,13 +153,13 @@ export default function MinePage() {
         )}
       </div>
 
-      {/* Menu Items */}
+      {/* Quick Actions */}
       <div
         className="overflow-hidden rounded-2xl bg-white"
         style={{ boxShadow: "0 2px 10px rgba(0,0,0,0.06)", border: "1px solid rgba(0,0,0,0.04)" }}
       >
         {[
-          { Icon: Bell, label: "消息通知", badge: true },
+          { Icon: Bell, label: "高频错题提醒", badge: true },
           { Icon: BarChart2, label: "趋势分析导出" },
         ].map(({ Icon, label, badge }, idx) => (
           <div
@@ -215,7 +215,7 @@ export default function MinePage() {
       {/* Logout */}
       <button
         type="button"
-        onClick={() => { clearStudentSession(); navigate("/student/login"); }}
+        onClick={() => { clearStudentSession(); navigate("/login"); }}
         className="flex w-full items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white py-3.5 text-[14px] font-semibold text-red-500 transition active:scale-[0.98]"
         style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}
       >
