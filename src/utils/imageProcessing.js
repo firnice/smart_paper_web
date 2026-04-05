@@ -48,6 +48,34 @@ export async function cropDataUrlBySourceRect(sourceDataUrl, rect, outputType = 
   return canvas.toDataURL(outputType);
 }
 
+export async function rotateImageDataUrl(sourceDataUrl, direction = "right", outputType = "image/png") {
+  if (!sourceDataUrl) {
+    throw new Error("缺少源图片");
+  }
+
+  const sourceImage = await loadImageFromDataUrl(sourceDataUrl);
+  const rotateLeft = direction === "left";
+  const canvas = document.createElement("canvas");
+  canvas.width = sourceImage.height;
+  canvas.height = sourceImage.width;
+
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("浏览器不支持图片旋转");
+  }
+
+  if (rotateLeft) {
+    context.translate(0, canvas.height);
+    context.rotate(-Math.PI / 2);
+  } else {
+    context.translate(canvas.width, 0);
+    context.rotate(Math.PI / 2);
+  }
+
+  context.drawImage(sourceImage, 0, 0);
+  return canvas.toDataURL(outputType);
+}
+
 export function normalizeOcrImageUrl(url) {
   const value = String(url || "").trim();
   if (!value) return "";
