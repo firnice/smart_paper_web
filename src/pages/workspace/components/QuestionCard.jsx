@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Dumbbell, Trash2, Pencil, Bookmark, BookmarkCheck, CheckCircle2, Circle, ChevronDown, ChevronUp } from "lucide-react";
 
 const STATUS_STYLE = {
@@ -25,20 +26,16 @@ function getSubjectStyle(subject) {
 
 export default function QuestionCard({
   item,
-  studyRecords,
-  studyRecordTotal,
-  onPractice,
   onChangeStatus,
   onToggleBookmark,
   onStartEdit,
   onDelete,
 }) {
-  const [showQuickTrain, setShowQuickTrain] = useState(false);
   const [showFullImage, setShowFullImage] = useState(false);
+  const navigate = useNavigate();
 
   const status = STATUS_STYLE[item.status] || STATUS_STYLE.new;
   const subjectStyle = getSubjectStyle(item.subject);
-  const total = studyRecordTotal ?? (studyRecords || []).length;
   const isMastered = item.status === "mastered";
 
   return (
@@ -99,14 +96,14 @@ export default function QuestionCard({
             <img
               src={item.image_data}
               alt={item.image_name || item.title}
-              className="h-32 w-full object-cover"
+              className="max-h-72 w-full object-contain"
             />
           </div>
         )}
       </div>
 
       {/* View original photo link */}
-      {item.image_data && (
+      {item.original_image_data && (
         <div className="border-t border-gray-50 px-4 py-2">
           <button
             type="button"
@@ -121,7 +118,11 @@ export default function QuestionCard({
           </button>
           {showFullImage && (
             <div className="mt-2 overflow-hidden rounded-xl">
-              <img src={item.image_data} alt={item.title} className="w-full" />
+              <img
+                src={item.original_image_data}
+                alt={item.original_image_name || item.title}
+                className="max-h-[70vh] w-full object-contain"
+              />
             </div>
           )}
         </div>
@@ -138,13 +139,13 @@ export default function QuestionCard({
               ? { background: "#ECFDF5", color: "#10B981" }
               : { background: "#F3F4F6", color: "#6B7280" }
           }
-          onClick={() => onChangeStatus(item.id, isMastered ? "reviewing" : "mastered")}
+          onClick={() => onChangeStatus(item.id, isMastered ? "new" : "mastered")}
         >
           {isMastered
             ? <CheckCircle2 className="h-3.5 w-3.5" />
             : <Circle className="h-3.5 w-3.5" />
           }
-          {isMastered ? "已掌握" : "标记掌握"}
+          {isMastered ? "标记未掌握" : "标记已掌握"}
         </button>
 
         {/* Quick Train Button */}
@@ -152,56 +153,12 @@ export default function QuestionCard({
           type="button"
           className="ml-auto flex items-center gap-1.5 rounded-xl px-3 py-2 text-[12px] font-bold text-white transition active:scale-95"
           style={{ background: "linear-gradient(135deg, #6366F1, #8B5CF6)", boxShadow: "0 2px 8px rgba(99,102,241,0.3)" }}
-          onClick={() => setShowQuickTrain((v) => !v)}
+          onClick={() => navigate(`/print?ids=${item.id}`)}
         >
           <Dumbbell className="h-3.5 w-3.5" />
           快速训练
         </button>
       </div>
-
-      {/* Quick Train Panel */}
-      {showQuickTrain && (
-        <div className="border-t border-gray-100 bg-gray-50 px-4 py-3">
-          <p className="mb-2.5 text-[12px] font-semibold text-gray-400">选择训练方式</p>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              className="flex flex-1 flex-col items-center gap-2 rounded-xl border border-gray-200 bg-white py-3 text-center transition active:scale-95"
-              onClick={() => { onPractice(item.id, "correct"); setShowQuickTrain(false); }}
-            >
-              <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-              <span className="text-[11px] font-semibold text-gray-700">本次做对</span>
-            </button>
-            <button
-              type="button"
-              className="flex flex-1 flex-col items-center gap-2 rounded-xl border border-gray-200 bg-white py-3 text-center transition active:scale-95"
-              onClick={() => { onPractice(item.id, "incorrect"); setShowQuickTrain(false); }}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth={2} className="h-5 w-5">
-                <circle cx="12" cy="12" r="10" />
-                <path strokeLinecap="round" d="M15 9l-6 6M9 9l6 6" />
-              </svg>
-              <span className="text-[11px] font-semibold text-gray-700">仍然做错</span>
-            </button>
-            <button
-              type="button"
-              className="flex flex-1 flex-col items-center gap-2 rounded-xl border border-indigo-100 bg-indigo-50 py-3 text-center transition active:scale-95"
-              onClick={() => setShowQuickTrain(false)}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth={2} className="h-5 w-5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              <span className="text-[11px] font-semibold text-indigo-600">
-                AI 变式
-                <span className="ml-0.5 inline-block rounded bg-indigo-500 px-1 text-[9px] text-white">New</span>
-              </span>
-            </button>
-          </div>
-          {total > 0 && (
-            <p className="mt-2 text-center text-[11px] text-gray-400">累计练习 {total} 次</p>
-          )}
-        </div>
-      )}
 
       {/* Edit / Delete */}
       <div className="flex justify-end gap-4 border-t border-gray-50 px-4 py-2.5">

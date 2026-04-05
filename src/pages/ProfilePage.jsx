@@ -109,7 +109,7 @@ export default function ProfilePage() {
   const recentQuestions = useMemo(() => questions.slice(0, 4), [questions]);
 
   if (!studentId) {
-    return <div className="workspace-alert error">请先登录家庭入口。</div>;
+    return <div className="workspace-alert error">请先登录后继续。</div>;
   }
 
   return (
@@ -117,8 +117,8 @@ export default function ProfilePage() {
       <div className="rounded-3xl bg-gradient-to-br from-indigo-600 to-violet-700 p-6 text-white shadow-lg">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-sm text-indigo-100">家庭工作台</p>
-            <h1 className="mt-1 text-3xl font-bold">{student?.name || "已绑定孩子"}</h1>
+            <p className="text-sm text-indigo-100">用户中心</p>
+            <h1 className="mt-1 text-3xl font-bold">{student?.name || "当前用户"}</h1>
             <p className="mt-2 text-sm text-indigo-100">
               年级：{profile.grade || "-"} · 学号：{profile.student_no || "-"}
             </p>

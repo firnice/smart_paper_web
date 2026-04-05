@@ -15,10 +15,10 @@ export default function FilterBar({ filters, setFilters, filterSubjectOptions, f
   ];
 
   return (
-    <div className="mb-4 space-y-3">
+    <div className="mb-5 space-y-4 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4">
       {/* Segmented Control: 掌握状态 */}
       <div
-        className="flex rounded-xl p-1"
+        className="flex rounded-2xl p-1"
         style={{ background: "rgba(99,102,241,0.08)" }}
       >
         {statusOptions.map((opt) => (
@@ -39,10 +39,10 @@ export default function FilterBar({ filters, setFilters, filterSubjectOptions, f
       </div>
 
       {/* Dropdowns Row */}
-      <div className="flex gap-2">
+      <div className="grid gap-3 lg:grid-cols-[220px_220px_minmax(0,1fr)]">
         <div className="relative flex-1">
           <select
-            className="w-full appearance-none rounded-xl border border-gray-200 bg-white py-2 pl-3 pr-7 text-[13px] font-medium text-gray-700 outline-none"
+            className="w-full appearance-none rounded-xl border border-gray-200 bg-white py-2.5 pl-3 pr-7 text-[13px] font-medium text-gray-700 outline-none"
             style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}
             value={filters.subject}
             onChange={(e) => setFilters((prev) => ({ ...prev, subject: e.target.value }))}
@@ -59,12 +59,12 @@ export default function FilterBar({ filters, setFilters, filterSubjectOptions, f
 
         <div className="relative flex-1">
           <select
-            className="w-full appearance-none rounded-xl border border-gray-200 bg-white py-2 pl-3 pr-7 text-[13px] font-medium text-gray-700 outline-none"
+            className="w-full appearance-none rounded-xl border border-gray-200 bg-white py-2.5 pl-3 pr-7 text-[13px] font-medium text-gray-700 outline-none"
             style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}
             value={filters.term}
             onChange={(e) => setFilters((prev) => ({ ...prev, term: e.target.value }))}
           >
-            <option value="">全部学期</option>
+            <option value="">全部年级/学期</option>
             {filterTermOptions.map((t) => (
               <option key={t} value={t}>{t}</option>
             ))}
@@ -81,7 +81,7 @@ export default function FilterBar({ filters, setFilters, filterSubjectOptions, f
           <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
         <input
-          className="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-[13px] text-gray-700 outline-none"
+          className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-9 pr-3 text-[13px] text-gray-700 outline-none"
           style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}
           placeholder="搜索标题 / 内容 / 错误原因"
           value={filters.keyword}

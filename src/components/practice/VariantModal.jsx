@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import useEscapeKey from "../../hooks/useEscapeKey.js";
 
 const backdropStyle = {
   position: "fixed",
@@ -169,6 +170,8 @@ export default function VariantModal({ question, onClose, generateFn }) {
   const [showAnswer, setShowAnswer] = useState(false);
   const [results, setResults] = useState([]); // { idx, result }
   const [finished, setFinished] = useState(false);
+
+  useEscapeKey(Boolean(question), onClose);
 
   useEffect(() => {
     if (!question?.id || !generateFn) return;

@@ -18,6 +18,7 @@ import {
   normalizeTextForCard,
   rotateImageDataUrl,
 } from "../../../utils/imageProcessing.js";
+import { rememberOriginalImageForQuestion } from "../originalImageCache.js";
 
 const DEFAULT_PAPER_CROP = { x: 18, y: 20, w: 60, h: 28 };
 const DEFAULT_SVG_CROP = { x: 24, y: 24, w: 36, h: 28 };
@@ -40,6 +41,10 @@ function buildQuestionTitle(questionText, questionId) {
   const firstLine = normalizeTextForCard(questionText).split("\n")[0] || "";
   const cleaned = firstLine.replace(/^\d+[\.\)、]\s*/, "").trim();
   return cleaned.slice(0, 28) || `第${questionId}题`;
+}
+
+function normalizeRecognitionPrompt(value) {
+  return String(value || "").trim();
 }
 
 function createDemoRecognitionItems() {
@@ -109,6 +114,7 @@ export default function useComposer({
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [recognizeError, setRecognizeError] = useState("");
   const [lastRecognitionMode, setLastRecognitionMode] = useState("selection");
+  const [recognitionPrompt, setRecognitionPrompt] = useState("");
   const [questions, setQuestions] = useState([]);
   const [expandedPaperId, setExpandedPaperId] = useState(null);
   const [expandedPromptId, setExpandedPromptId] = useState(null);
@@ -128,6 +134,7 @@ export default function useComposer({
     setIsRecognizing(false);
     setRecognizeError("");
     setLastRecognitionMode("selection");
+    setRecognitionPrompt("");
     setQuestions([]);
     setExpandedPaperId(null);
     setExpandedPromptId(null);
@@ -243,21 +250,27 @@ export default function useComposer({
     });
   };
 
-  const onRecognize = async (mode) => {
+  const onRecognize = async (mode, options = {}) => {
     setIsRecognizing(true);
     setRecognizeError("");
     setLastRecognitionMode(mode);
     setExpandedPaperId(null);
     setExpandedPromptId(null);
 
+    const resolvedPrompt = normalizeRecognitionPrompt(options.prompt ?? recognitionPrompt);
+
     try {
       const file = await buildRecognitionFile(mode);
       let items = [];
       let isDemoFallback = false;
+      let nextUsedPrompt = resolvedPrompt;
 
       try {
-        const response = await extractQuestions(file);
+        const response = await extractQuestions(file, { prompt: resolvedPrompt });
         items = normalizeOcrItems(response?.items);
+        nextUsedPrompt = normalizeRecognitionPrompt(
+          response?.used_prompt ?? response?.prompt ?? resolvedPrompt,
+        );
       } catch (error) {
         const message = getErrorMessage(error);
         if (!isBackendUnavailable(message)) {
@@ -274,6 +287,7 @@ export default function useComposer({
 
       const nextQuestions = await enrichQuestions(items);
       setQuestions(nextQuestions);
+      setRecognitionPrompt(nextUsedPrompt);
       setStep(3);
       if (isDemoFallback) {
         setSuccess("识别接口尚未接通，当前先使用前端演示题目结果");
@@ -483,6 +497,7 @@ export default function useComposer({
           const selectedReasons = errorReasonOptions
             .filter((item) => item.name === question.reason || question.reason.split(/\s*[\/、,，]\s*/).includes(item.name))
             .filter((item) => !category || !item.category_id || item.category_id === category.id);
+          const questionTitle = buildQuestionTitle(question.text, question.id);
           const notes = [
             sourceImage.name ? `原始附件：${sourceImage.name}` : "",
             question.reason && !selectedReasons.length ? `错误原因备注：${question.reason}` : "",
@@ -491,9 +506,9 @@ export default function useComposer({
             ? question.svgPreviewUrl
             : question.questionImageUrl || question.diagramImageUrl || sourceImage.data;
 
-          await createWrongQuestion({
+          const createdItem = await createWrongQuestion({
             student_id: Number(studentId),
-            title: buildQuestionTitle(question.text, question.id),
+            title: questionTitle,
             content: question.text,
             subject_id: subject?.id,
             grade: question.grade || profile.grade || undefined,
@@ -506,6 +521,15 @@ export default function useComposer({
             notes: notes || undefined,
             image_url: imageData || undefined,
             image_name: imageData ? resolveImageName(question, sourceImage.name) : undefined,
+            original_image_url: sourceImage.data || undefined,
+            original_image_name: sourceImage.name || undefined,
+          });
+          rememberOriginalImageForQuestion({
+            id: createdItem?.id,
+            title: createdItem?.title || questionTitle,
+            content: createdItem?.content || question.text,
+            imageData: sourceImage.data,
+            imageName: sourceImage.name,
           });
           savedCount += 1;
           setSaveState({
@@ -577,6 +601,7 @@ export default function useComposer({
     isRecognizing,
     recognizeError,
     lastRecognitionMode,
+    recognitionPrompt,
     questions,
     expandedPaperId,
     expandedPromptId,
@@ -595,6 +620,7 @@ export default function useComposer({
     onUseFile,
     onPickUpload,
     onRecognize,
+    setRecognitionPrompt,
     onRotatePaper,
     onToggleSelect,
     onToggleAll,

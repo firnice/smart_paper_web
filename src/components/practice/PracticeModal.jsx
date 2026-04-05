@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import useEscapeKey from "../../hooks/useEscapeKey.js";
 
 const backdropStyle = {
   position: "fixed",
@@ -104,6 +105,8 @@ const btnSkip = {
 };
 
 export default function PracticeModal({ question, onResult, onClose }) {
+  useEscapeKey(Boolean(question), onClose);
+
   const handleResult = useCallback(
     (result) => {
       if (onResult) onResult(question.id, result);

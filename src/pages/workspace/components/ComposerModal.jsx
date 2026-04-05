@@ -12,6 +12,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import useEscapeKey from "../../../hooks/useEscapeKey.js";
 import InteractiveCropBox from "./composer/InteractiveCropBox.jsx";
 import ComposerQuestionCard from "./composer/ComposerQuestionCard.jsx";
 import SvgCropDialog from "./composer/SvgCropDialog.jsx";
@@ -49,6 +50,7 @@ export default function ComposerModal({ composer }) {
     isRecognizing,
     recognizeError,
     lastRecognitionMode,
+    recognitionPrompt,
     questions,
     expandedPaperId,
     expandedPromptId,
@@ -65,6 +67,7 @@ export default function ComposerModal({ composer }) {
     onUseFile,
     onPickUpload,
     onRecognize,
+    setRecognitionPrompt,
     onRotatePaper,
     onToggleSelect,
     onToggleAll,
@@ -88,6 +91,8 @@ export default function ComposerModal({ composer }) {
     if (step === 2) return "框选题目";
     return "确认并保存";
   }, [step]);
+
+  useEscapeKey(isComposerOpen, onCloseComposer);
 
   if (!isComposerOpen) return null;
 
@@ -145,7 +150,7 @@ export default function ComposerModal({ composer }) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => onRecognize(lastRecognitionMode)}
+                    onClick={() => onRecognize(lastRecognitionMode, { prompt: recognitionPrompt })}
                     className="flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2 font-medium text-white hover:bg-blue-700"
                   >
                     <RefreshCw className="h-4 w-4" />
@@ -300,6 +305,17 @@ export default function ComposerModal({ composer }) {
                   </span>
                 </div>
 
+                <div className="mb-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <label className="mb-2 block text-sm font-medium text-gray-700">识别 Prompt</label>
+                  <textarea
+                    rows={2}
+                    value={recognitionPrompt}
+                    className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm leading-relaxed text-gray-800 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                    placeholder="输入识别 prompt"
+                    onChange={(event) => setRecognitionPrompt(event.target.value)}
+                  />
+                </div>
+
                 <div className="space-y-3">
                   {questions.map((question) => (
                     <ComposerQuestionCard
@@ -380,19 +396,29 @@ export default function ComposerModal({ composer }) {
               ) : null}
 
               {step === 3 && saveState.status === "idle" ? (
-                <button
-                  type="button"
-                  disabled={selectedCount === 0}
-                  onClick={persistSelectedQuestions}
-                  className={`flex items-center gap-2 rounded-lg px-6 py-2.5 font-medium shadow-sm transition-colors ${
-                    selectedCount > 0
-                      ? "bg-blue-600 text-white hover:bg-blue-700"
-                      : "cursor-not-allowed bg-gray-200 text-gray-400"
-                  }`}
-                >
-                  <Save className="h-4 w-4" />
-                  {selectedCount > 0 ? `保存已选 ${selectedCount} 道题` : "请至少选择一道题"}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onRecognize(lastRecognitionMode, { prompt: recognitionPrompt })}
+                    className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-5 py-2.5 font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    重新识别
+                  </button>
+                  <button
+                    type="button"
+                    disabled={selectedCount === 0}
+                    onClick={persistSelectedQuestions}
+                    className={`flex items-center gap-2 rounded-lg px-6 py-2.5 font-medium shadow-sm transition-colors ${
+                      selectedCount > 0
+                        ? "bg-blue-600 text-white hover:bg-blue-700"
+                        : "cursor-not-allowed bg-gray-200 text-gray-400"
+                    }`}
+                  >
+                    <Save className="h-4 w-4" />
+                    {selectedCount > 0 ? `保存已选 ${selectedCount} 道题` : "请至少选择一道题"}
+                  </button>
+                </>
               ) : null}
             </div>
           </div>

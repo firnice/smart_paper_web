@@ -21,6 +21,7 @@ import {
   resolveAssetUrl,
   updateWrongQuestion,
 } from "../../services/api.js";
+import useEscapeKey from "../../hooks/useEscapeKey.js";
 import { clearStudentSession, readStudentSession } from "../../utils/studentSession.js";
 
 const INITIAL_FORM = {
@@ -1228,6 +1229,9 @@ export default function StudentDashboardPage() {
     resetElementEditor();
     setIsComposerOpen(false);
   };
+
+  useEscapeKey(Boolean(editingItem), () => setEditingItem(null));
+  useEscapeKey(isComposerOpen, onCloseComposer);
 
   const onTriggerPick = (mode) => {
     if (mode === "camera") cameraInputRef.current?.click();

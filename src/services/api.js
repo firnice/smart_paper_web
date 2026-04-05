@@ -79,8 +79,12 @@ async function requestJson(path, options = {}, query = {}) {
   }
 
   if (!response.ok) {
+    const serviceUnavailableMessage = "服务暂时不可用，请稍后重试";
     const raw = await response.text();
     if (!raw) {
+      if (response.status >= 500) {
+        throw new Error(serviceUnavailableMessage);
+      }
       throw new Error(`Request failed: ${response.status}`);
     }
     let parsed = null;
@@ -88,7 +92,7 @@ async function requestJson(path, options = {}, query = {}) {
       parsed = JSON.parse(raw);
     } catch {
       if (response.status >= 500) {
-        throw new Error("服务暂时不可用，请稍后重试");
+        throw new Error(serviceUnavailableMessage);
       }
       throw new Error(raw || `Request failed: ${response.status}`);
     }
@@ -96,13 +100,16 @@ async function requestJson(path, options = {}, query = {}) {
     const detail = parsed?.detail;
     if (typeof detail === "string" && detail.trim()) {
       if (response.status >= 500) {
-        throw new Error("服务暂时不可用，请稍后重试");
+        throw new Error(serviceUnavailableMessage);
       }
       throw new Error(detail);
     }
     if (Array.isArray(detail) && detail.length > 0) {
       const message = detail.map((item) => item?.msg).filter(Boolean).join("; ");
       throw new Error(message || raw);
+    }
+    if (response.status >= 500) {
+      throw new Error(serviceUnavailableMessage);
     }
     throw new Error(raw || `Request failed: ${response.status}`);
   }
@@ -113,9 +120,12 @@ export async function checkHealth() {
   return requestJson("/api/health");
 }
 
-export async function extractQuestions(file) {
+export async function extractQuestions(file, options = {}) {
   const formData = new FormData();
   formData.append("file", file);
+  if (options.prompt) {
+    formData.append("prompt", String(options.prompt));
+  }
   return requestJson("/api/ocr/extract", {
     method: "POST",
     body: formData,

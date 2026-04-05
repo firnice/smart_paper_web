@@ -84,7 +84,7 @@ export function normalizeOcrImageUrl(url) {
   }
   const base = String(
     import.meta.env.VITE_API_BASE ||
-      (typeof window !== "undefined" && window.location?.origin ? window.location.origin : "http://localhost:8100"),
+      (typeof window !== "undefined" && window.location?.origin ? window.location.origin : "http://127.0.0.1:8000"),
   ).replace(/\/+$/, "");
   return `${base}${value.startsWith("/") ? "" : "/"}${value}`;
 }

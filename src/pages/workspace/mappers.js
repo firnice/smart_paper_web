@@ -1,5 +1,6 @@
 import { getDefaultSchoolTerm } from "../../services/studentDemo.js";
 import { resolveAssetUrl } from "../../services/api.js";
+import { resolveOriginalImageForQuestion } from "./originalImageCache.js";
 
 export function inferSchoolTerm(dateLike, grade) {
   if (!dateLike) return "";
@@ -38,6 +39,13 @@ export function mapWrongQuestionItem(item) {
   const firstReason = reasons[0]?.name || "待分析";
   const subjectName = item?.subject?.name || "未分类学科";
   const term = inferSchoolTerm(item?.first_error_date || item?.created_at, item?.grade);
+  const originalImage = resolveOriginalImageForQuestion({
+    id: item?.id,
+    title: item?.title,
+    content: item?.content,
+    imageData: resolveAssetUrl(item?.original_image_url),
+    imageName: item?.original_image_name || "",
+  });
 
   return {
     id: item.id,
@@ -59,5 +67,7 @@ export function mapWrongQuestionItem(item) {
     review_count: 0,
     image_data: resolveAssetUrl(item?.image_url),
     image_name: item?.image_name || "",
+    original_image_data: originalImage?.data || "",
+    original_image_name: originalImage?.name || "",
   };
 }

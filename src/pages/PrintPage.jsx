@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { CheckCircle2, ChevronDown, Printer } from "lucide-react";
 import { createExport, listWrongQuestions, resolveAssetUrl } from "../services/api.js";
 import { readStudentSession } from "../utils/studentSession.js";
@@ -49,6 +49,7 @@ function SummaryRow({ label, value, tone = "default" }) {
 
 export default function PrintPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const session = readStudentSession();
   const studentId = session?.student?.id;
 
@@ -63,6 +64,14 @@ export default function PrintPage() {
   const [error, setError] = useState("");
   const [exportData, setExportData] = useState(null);
 
+  const requestedIds = useMemo(() => {
+    const raw = new URLSearchParams(location.search).get("ids") || "";
+    return raw
+      .split(",")
+      .map((value) => Number(value.trim()))
+      .filter((value) => Number.isInteger(value) && value > 0);
+  }, [location.search]);
+
   useEffect(() => {
     if (!studentId) return;
     let active = true;
@@ -73,7 +82,11 @@ export default function PrintPage() {
         if (!active) return;
         const items = (res?.items || []).map(mapQuestion);
         setQuestions(items);
-        setSelectedIds(items.filter((item) => item.status !== "mastered").slice(0, 6).map((item) => item.id));
+        const availableIds = new Set(items.map((item) => item.id));
+        const nextSelectedIds = requestedIds.length
+          ? requestedIds.filter((id) => availableIds.has(id))
+          : items.filter((item) => item.status !== "mastered").slice(0, 6).map((item) => item.id);
+        setSelectedIds(nextSelectedIds);
       })
       .catch((err) => {
         if (!active) return;
@@ -85,7 +98,7 @@ export default function PrintPage() {
     return () => {
       active = false;
     };
-  }, [studentId]);
+  }, [requestedIds, studentId]);
 
   const selectedQuestions = useMemo(
     () => questions.filter((item) => selectedIds.includes(item.id)),
@@ -146,7 +159,7 @@ export default function PrintPage() {
     return (
       <div className="mx-auto max-w-2xl space-y-4 pb-4 pt-6">
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          请先登录家庭入口，再生成重做打印包。
+          请先登录后再生成重做打印包。
         </div>
         <button onClick={() => navigate("/login")} className="btn-primary">
           去登录

@@ -92,7 +92,7 @@ export default function MinePage() {
   const recentQuestions = useMemo(() => questions.slice(0, 4), [questions]);
 
   if (!studentId) {
-    return <div className="workspace-alert error">请先登录家庭入口。</div>;
+    return <div className="workspace-alert error">请先登录后继续。</div>;
   }
 
   return (

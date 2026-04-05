@@ -1,7 +1,10 @@
 import { Check, Wand2, X } from "lucide-react";
+import useEscapeKey from "../../../../hooks/useEscapeKey.js";
 import InteractiveCropBox from "./InteractiveCropBox.jsx";
 
 export default function SvgCropDialog({ question, imageSrc, onClose, onConfirm, onChangeCrop }) {
+  useEscapeKey(Boolean(question && imageSrc), onClose);
+
   if (!question || !imageSrc) return null;
 
   return (

@@ -191,7 +191,7 @@ export default function QuestionBankPage() {
   }, [questions, selectedIds]);
 
   if (!studentId) {
-    return <div className="workspace-alert error">请先登录学生端，再查看错题本。</div>;
+    return <div className="workspace-alert error">请先登录后再查看错题本。</div>;
   }
 
   const selectedCount = selectedIds.size;

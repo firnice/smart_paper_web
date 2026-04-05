@@ -1,4 +1,8 @@
+import useEscapeKey from "../../../hooks/useEscapeKey.js";
+
 export default function EditModal({ editingItem, editForm, setEditForm, errorReasonOptions, onSubmitEdit, onClose }) {
+  useEscapeKey(Boolean(editingItem), onClose);
+
   if (!editingItem) return null;
 
   return (

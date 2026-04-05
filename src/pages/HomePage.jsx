@@ -48,7 +48,7 @@ export default function HomePage() {
   const pendingCount = Math.max(0, totalCount - masteredCount);
   const masteryRate = totalCount > 0 ? Math.round((masteredCount / totalCount) * 100) : 0;
 
-  if (!studentId) return <div className="workspace-alert error">请先登录学生端。</div>;
+  if (!studentId) return <div className="workspace-alert error">请先登录后继续。</div>;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
