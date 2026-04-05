@@ -1,100 +1,133 @@
-import { TrendingUp, CalendarDays, Target, Award } from "lucide-react";
+import { BarChart2, Percent, BookOpen, Flame } from "lucide-react";
+import {
+  RadarChart,
+  Radar,
+  PolarGrid,
+  PolarAngleAxis,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import { RADAR_DATA } from "../data/figmaMock.js";
 
-const ACHIEVEMENTS = [
-  { label: "坚持", icon: "🔥", value: "14天" },
-  { label: "专注", icon: "🎯", value: "58次" },
-  { label: "进步", icon: "📈", value: "+5%" },
+const WEEK_TREND = [
+  { day: "周一", errors: 8, resolved: 8 },
+  { day: "周二", errors: 6, resolved: 4 },
+  { day: "周三", errors: 4, resolved: 4 },
+  { day: "周四", errors: 9, resolved: 8 },
+  { day: "周五", errors: 7, resolved: 10 },
+  { day: "周六", errors: 12, resolved: 12 },
+  { day: "周日", errors: 5, resolved: 4 },
 ];
 
-const SUBJECT_PROGRESS = [
-  { subject: "数学", progress: 75, color: "bg-blue-500" },
-  { subject: "物理", progress: 60, color: "bg-purple-500" },
-  { subject: "英语", progress: 85, color: "bg-emerald-500" },
-  { subject: "化学", progress: 45, color: "bg-orange-500" },
-];
+const radarDataFormatted = RADAR_DATA.map((d) => ({ ...d, fullMark: 100 }));
 
 export default function ProfilePage() {
   return (
-    <div className="mx-auto max-w-2xl space-y-6 pb-4">
-      <div className="pt-2 pb-4">
-        <h1 className="text-2xl font-bold text-gray-900">我的学习</h1>
-        <p className="mt-1 text-sm text-gray-500">本月已记录 142 道错题</p>
+    <div className="space-y-6">
+      {/* 页头 */}
+      <div>
+        <div className="flex items-center gap-2 mb-1">
+          <BarChart2 className="h-5 w-5 text-indigo-500" />
+          <h1 className="text-2xl font-bold text-gray-900">学情画像</h1>
+        </div>
+        <p className="text-sm text-gray-500">
+          本月累计记录错题 142 道，已解决 98 道，综合掌握度提升 12%。
+        </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="rounded-2xl bg-gradient-to-br from-indigo-600 to-indigo-700 p-5 text-white shadow-lg">
-          <div className="mb-2 flex items-center gap-2">
-            <Target className="h-5 w-5 text-indigo-200" />
-            <span className="text-sm text-indigo-200">正确率</span>
+      {/* 三卡片统计 */}
+      <div className="grid grid-cols-3 gap-4">
+        {/* 近期平均正确率 - 紫色渐变 */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 p-5 text-white">
+          <Percent className="absolute right-4 top-4 h-16 w-16 text-white/20" />
+          <div className="flex items-center gap-2 mb-2 text-sm text-indigo-100">
+            <Percent className="h-4 w-4" />
+            近期平均正确率
           </div>
-          <div className="text-3xl font-bold">78%</div>
-          <div className="mt-2 text-xs text-indigo-200">提升 5% ↑</div>
+          <div className="text-4xl font-bold mb-1">78%</div>
+          <div className="text-sm text-indigo-200">较上月提升 5% ↑</div>
         </div>
 
+        {/* 本周错题消灭率 */}
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-          <div className="mb-2 flex items-center gap-2">
-            <CalendarDays className="h-5 w-5 text-amber-500" />
-            <span className="text-sm text-gray-600">坚持天数</span>
+          <div className="flex items-center gap-2 mb-2 text-sm text-gray-500">
+            <BookOpen className="h-4 w-4 text-emerald-500" />
+            本周错题消灭率
           </div>
-          <div className="text-3xl font-bold text-gray-900">14</div>
-          <div className="mt-2 text-xs text-amber-600">继续保持！</div>
+          <div className="text-4xl font-bold text-gray-900 mb-1">62%</div>
+          <div className="text-sm text-emerald-500 font-medium">击败了 85% 的同学</div>
         </div>
-      </div>
 
-      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-        <h3 className="mb-4 flex items-center gap-2 font-semibold text-gray-900">
-          <TrendingUp className="h-5 w-5 text-indigo-600" />
-          本周学习概况
-        </h3>
-
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600">新增错题</span>
-            <span className="text-lg font-bold text-gray-900">42 道</span>
+        {/* 连续记录天数 */}
+        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-2 text-sm text-gray-500">
+            <Flame className="h-4 w-4 text-amber-500" />
+            连续记录天数
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600">已解决</span>
-            <span className="text-lg font-bold text-emerald-600">26 道</span>
+          <div className="text-4xl font-bold text-gray-900 mb-1">
+            14 <span className="text-2xl font-normal text-gray-600">天</span>
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600">练习次数</span>
-            <span className="text-lg font-bold text-indigo-600">58 次</span>
+          <div className="inline-block rounded-full bg-amber-100 px-3 py-0.5 text-xs font-medium text-amber-600">
+            继续保持！
           </div>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-        <h3 className="mb-4 flex items-center gap-2 font-semibold text-gray-900">
-          <Award className="h-5 w-5 text-amber-500" />
-          近期成就
-        </h3>
-
-        <div className="grid grid-cols-3 gap-3">
-          {ACHIEVEMENTS.map((achievement) => (
-            <div key={achievement.label} className="rounded-xl bg-gray-50 p-4 text-center">
-              <div className="mb-2 text-2xl">{achievement.icon}</div>
-              <div className="mb-1 text-xs text-gray-500">{achievement.label}</div>
-              <div className="text-sm font-bold text-gray-900">{achievement.value}</div>
-            </div>
-          ))}
+      {/* 图表区域 */}
+      <div className="grid grid-cols-2 gap-4">
+        {/* 能力雷达图 */}
+        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-base">🎯</span>
+            <h2 className="font-semibold text-gray-900">能力雷达分布</h2>
+          </div>
+          <ResponsiveContainer width="100%" height={260}>
+            <RadarChart data={radarDataFormatted}>
+              <PolarGrid stroke="#e5e7eb" />
+              <PolarAngleAxis
+                dataKey="subject"
+                tick={{ fill: "#6b7280", fontSize: 13 }}
+              />
+              <Radar
+                name="能力值"
+                dataKey="value"
+                stroke="#6366f1"
+                fill="#6366f1"
+                fillOpacity={0.25}
+                strokeWidth={2}
+              />
+            </RadarChart>
+          </ResponsiveContainer>
         </div>
-      </div>
 
-      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-        <h3 className="mb-4 font-semibold text-gray-900">各科表现</h3>
-
-        <div className="space-y-3">
-          {SUBJECT_PROGRESS.map((item) => (
-            <div key={item.subject}>
-              <div className="mb-1.5 flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-700">{item.subject}</span>
-                <span className="text-sm font-semibold text-gray-900">{item.progress}%</span>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-gray-100">
-                <div className={`h-full rounded-full transition-all ${item.color}`} style={{ width: `${item.progress}%` }} />
-              </div>
-            </div>
-          ))}
+        {/* 本周错题处理趋势折线图 */}
+        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-base">📈</span>
+            <h2 className="font-semibold text-gray-900">本周错题处理趋势</h2>
+          </div>
+          <ResponsiveContainer width="100%" height={260}>
+            <LineChart data={WEEK_TREND}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+              <XAxis dataKey="day" tick={{ fill: "#9ca3af", fontSize: 12 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: "#9ca3af", fontSize: 12 }} axisLine={false} tickLine={false} />
+              <Tooltip
+                contentStyle={{ borderRadius: "8px", border: "1px solid #e5e7eb", fontSize: 12 }}
+              />
+              <Legend
+                wrapperStyle={{ fontSize: 12 }}
+                formatter={(value) => (value === "errors" ? "错题数" : "解决数")}
+              />
+              <Line type="monotone" dataKey="errors" stroke="#ef4444" strokeWidth={2} dot={false} name="errors" />
+              <Line type="monotone" dataKey="resolved" stroke="#10b981" strokeWidth={2} dot={false} name="resolved" />
+            </LineChart>
+          </ResponsiveContainer>
         </div>
       </div>
     </div>
