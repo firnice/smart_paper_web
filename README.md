@@ -40,6 +40,12 @@ npm run build
 ```
 
 > 所有命令需在 `lf-smart-paper-web/` 仓库根目录执行。
+>
+> 当前本地联调默认约定：
+>
+> - 前端：`5173`
+> - 后端：`8100`
+> - Vite dev server 会将 `/api` 和 `/static` 代理到 `8100`
 
 ## 页面路由
 
@@ -52,4 +58,4 @@ npm run build
 
 ## 环境变量
 
-- `VITE_API_BASE`：后端 API 地址（默认 `http://localhost:8000`）
+- `VITE_API_BASE`：后端 API 地址（可选；默认优先走当前站点同域 `/api` / `/static`，本地联调时 dev server 代理到 `http://localhost:8100`）
