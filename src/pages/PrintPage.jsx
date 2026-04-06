@@ -1,48 +1,188 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { CheckCircle2, ChevronDown, Printer } from "lucide-react";
-import { createExport, listWrongQuestions, resolveAssetUrl } from "../services/api.js";
+import { toast } from "sonner";
+import { createPrintPackExport, generateVariantsForQuestion, listWrongQuestions, resolveAssetUrl } from "../services/api.js";
 import { readStudentSession } from "../utils/studentSession.js";
-import { getDefaultSchoolTerm } from "../services/studentDemo.js";
+import PrintWorkbenchStepper from "./print/components/PrintWorkbenchStepper.jsx";
+import SelectQuestionsStep from "./print/components/SelectQuestionsStep.jsx";
+import PracticeConfigStep from "./print/components/PracticeConfigStep.jsx";
+import PreviewArrangeStep from "./print/components/PreviewArrangeStep.jsx";
+import {
+  ANSWER_MODES,
+  DEFAULT_PROMPT,
+  STEP_META,
+  buildPrintExportPayload,
+  buildPreviewItems,
+  buildPreviewSourceKey,
+  createEmptyConfig,
+  estimatePages,
+  mapWrongQuestionToPrintQuestion,
+  normalizeVariantItem,
+} from "./print/helpers.js";
+import "../styles/print-workbench.css";
 
-const MODES = [
-  { id: "simple", label: "仅原题", desc: "按原题打印重做" },
-  { id: "medium", label: "适中练习", desc: "原题优先，预留拓展空间" },
-  { id: "intensive", label: "强化训练", desc: "更多题目，集中重做" },
-];
+function resolveInitialSelection(items, requestedIds, previousIds) {
+  const available = new Set(items.map((item) => item.id));
 
-function inferTerm(dateLike, grade) {
-  if (!dateLike) return "";
-  return getDefaultSchoolTerm(dateLike, grade);
+  if (requestedIds.length > 0) {
+    return requestedIds.map(String).filter((id) => available.has(id));
+  }
+
+  if (previousIds.length > 0) {
+    const kept = previousIds.filter((id) => available.has(id));
+    if (kept.length > 0) return kept;
+  }
+
+  return items
+    .filter((item) => item.status !== "mastered")
+    .slice(0, 6)
+    .map((item) => item.id);
 }
 
-function mapQuestion(item) {
-  return {
-    id: item.id,
-    title: item.title || "未命名错题",
-    subject: item.subject?.name || "未分类学科",
-    content: item.content || "",
-    imageUrl: resolveAssetUrl(item.image_url),
-    imageName: item.image_name || "",
-    status: item.status || "new",
-    isBookmarked: Boolean(item.is_bookmarked),
-    category: item.category?.name || "未分类",
-    updatedAt: item.updated_at || item.created_at || "",
-    term: inferTerm(item.first_error_date || item.created_at, item.grade),
-  };
-}
-
-function SummaryRow({ label, value, tone = "default" }) {
-  const toneClass = tone === "accent"
-    ? "bg-indigo-50 text-indigo-700"
-    : tone === "success"
-      ? "bg-emerald-50 text-emerald-700"
-      : "bg-slate-50 text-slate-700";
+function PrintBottomBar({
+  step,
+  selectedCount,
+  filteredCount,
+  allFilteredSelected,
+  aiReadyCount,
+  generatingCount,
+  previewCount,
+  estimatedPages,
+  answerMode,
+  exportUrl,
+  exporting,
+  onSelectAll,
+  onClearSelection,
+  onBack,
+  onNext,
+  onExport,
+}) {
+  const answerModeTitle = ANSWER_MODES.find((item) => item.id === answerMode)?.title || "";
 
   return (
-    <div className={`flex items-center justify-between rounded-2xl px-3 py-3 text-sm ${toneClass}`}>
-      <span>{label}</span>
-      <strong>{value}</strong>
+    <div className="print-workbench-screen-only print-workbench-fixed-bar">
+      <div className="print-workbench-fixed-bar-inner">
+        {step === 1 ? (
+          <>
+            <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600">
+              <div>
+                已选题目：<span className="font-semibold text-indigo-600">{selectedCount} 题</span>
+              </div>
+              <div>
+                当前结果：<span className="font-semibold text-slate-900">{filteredCount} 题</span>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                disabled={filteredCount === 0 || allFilteredSelected}
+                onClick={onSelectAll}
+                className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-5 text-[13px] font-medium text-slate-700 transition hover:border-indigo-200 hover:text-indigo-700 disabled:cursor-not-allowed disabled:text-slate-400"
+              >
+                全选
+              </button>
+              <button
+                type="button"
+                disabled={selectedCount === 0}
+                onClick={onClearSelection}
+                className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-5 text-[13px] font-medium text-slate-700 transition hover:border-rose-200 hover:text-rose-600 disabled:cursor-not-allowed disabled:text-slate-400"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                disabled={selectedCount === 0}
+                onClick={onNext}
+                className="inline-flex h-11 items-center justify-center rounded-xl bg-indigo-600 px-5 text-[13px] font-medium text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+              >
+                下一步：配置练习
+              </button>
+            </div>
+          </>
+        ) : null}
+
+        {step === 2 ? (
+          <>
+            <div className="flex flex-wrap items-center gap-5 text-sm text-slate-600">
+              <div>
+                原题：<span className="font-semibold text-slate-900">{selectedCount}</span>
+              </div>
+              <div>
+                AI 生成：<span className="font-semibold text-indigo-600">{aiReadyCount}</span>
+              </div>
+              <div>
+                合计：<span className="font-semibold text-slate-900">{selectedCount + aiReadyCount} 题</span>
+              </div>
+              {generatingCount > 0 ? (
+                <div className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
+                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                  生成中 {generatingCount} 题
+                </div>
+              ) : null}
+            </div>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={onBack}
+                className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-5 text-[13px] font-medium text-slate-700 transition hover:border-indigo-200 hover:text-indigo-700"
+              >
+                上一步
+              </button>
+              <button
+                type="button"
+                disabled={selectedCount === 0 || generatingCount > 0}
+                onClick={onNext}
+                className="inline-flex h-11 items-center justify-center rounded-xl bg-indigo-600 px-5 text-[13px] font-medium text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+              >
+                下一步：预览与排版
+              </button>
+            </div>
+          </>
+        ) : null}
+
+        {step === 3 ? (
+          <>
+            <div className="flex flex-wrap items-center gap-5 text-sm text-slate-600">
+              <div>
+                最终题数：<span className="font-semibold text-slate-900">{previewCount}</span>
+              </div>
+              <div>
+                预计页数：<span className="font-semibold text-indigo-600">{estimatedPages} 页</span>
+              </div>
+              <div>
+                答案方式：<span className="font-semibold text-slate-900">{answerModeTitle}</span>
+              </div>
+              {exportUrl ? (
+                <a
+                  href={exportUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[13px] font-medium text-indigo-600 transition hover:text-indigo-700"
+                >
+                  查看最近一次导出结果
+                </a>
+              ) : null}
+            </div>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={onBack}
+                className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-5 text-[13px] font-medium text-slate-700 transition hover:border-indigo-200 hover:text-indigo-700"
+              >
+                返回修改
+              </button>
+              <button
+                type="button"
+                disabled={previewCount === 0 || exporting}
+                onClick={onExport}
+                className="inline-flex h-11 items-center justify-center rounded-xl bg-indigo-600 px-5 text-[13px] font-medium text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+              >
+                {exporting ? "导出中..." : "导出 PDF"}
+              </button>
+            </div>
+          </>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -51,117 +191,394 @@ export default function PrintPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const session = readStudentSession();
-  const studentId = session?.student?.id;
+  const student = session?.student || null;
+  const studentId = student?.id;
+  const studentGrade = student?.student_profile?.grade || "";
 
+  const [step, setStep] = useState(1);
+  const [search, setSearch] = useState("");
   const [questions, setQuestions] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
-  const [mode, setMode] = useState("medium");
-  const [hideAnswers, setHideAnswers] = useState(true);
-  const [showSettings, setShowSettings] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isDone, setIsDone] = useState(false);
+  const [answerMode, setAnswerMode] = useState(ANSWER_MODES[2].id);
+  const [configs, setConfigs] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [exportData, setExportData] = useState(null);
+  const [previewState, setPreviewState] = useState({ sourceKey: "", items: [] });
+  const [exporting, setExporting] = useState(false);
+  const [exportUrl, setExportUrl] = useState("");
 
   const requestedIds = useMemo(() => {
     const raw = new URLSearchParams(location.search).get("ids") || "";
     return raw
       .split(",")
-      .map((value) => Number(value.trim()))
-      .filter((value) => Number.isInteger(value) && value > 0);
+      .map((value) => value.trim())
+      .filter(Boolean);
   }, [location.search]);
+
+  const refreshQuestions = useCallback(async () => {
+    if (!studentId) return;
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await listWrongQuestions({ student_id: studentId, limit: 100 });
+      const mapped = (response?.items || []).map((item) => mapWrongQuestionToPrintQuestion(item, studentGrade));
+      setQuestions(mapped);
+      setSelectedIds((previousIds) => resolveInitialSelection(mapped, requestedIds, previousIds));
+    } catch (err) {
+      setError(err?.message || "错题列表加载失败");
+    } finally {
+      setLoading(false);
+    }
+  }, [requestedIds, studentGrade, studentId]);
 
   useEffect(() => {
     if (!studentId) return;
-    let active = true;
-    setLoading(true);
-    setError("");
-    listWrongQuestions({ student_id: studentId, limit: 100 })
-      .then((res) => {
-        if (!active) return;
-        const items = (res?.items || []).map(mapQuestion);
-        setQuestions(items);
-        const availableIds = new Set(items.map((item) => item.id));
-        const nextSelectedIds = requestedIds.length
-          ? requestedIds.filter((id) => availableIds.has(id))
-          : items.filter((item) => item.status !== "mastered").slice(0, 6).map((item) => item.id);
-        setSelectedIds(nextSelectedIds);
-      })
-      .catch((err) => {
-        if (!active) return;
-        setError(err?.message || "真实错题加载失败");
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [requestedIds, studentId]);
+    refreshQuestions();
+  }, [studentId, refreshQuestions]);
 
   const selectedQuestions = useMemo(
     () => questions.filter((item) => selectedIds.includes(item.id)),
     [questions, selectedIds],
   );
 
-  const resolvedModes = MODES.map((item) => ({
-    ...item,
-    count:
-      item.id === "simple"
-        ? selectedQuestions.length
-        : item.id === "medium"
-          ? selectedQuestions.length
-          : Math.max(selectedQuestions.length, Math.min(selectedQuestions.length + 2, questions.length)),
-  }));
+  const filteredQuestions = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+    if (!keyword) return questions;
+    return questions.filter((item) => {
+      const source = [item.subject, item.grade, item.title, item.content, item.category, item.errorReason, item.keywords]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return source.includes(keyword);
+    });
+  }, [questions, search]);
 
-  const currentMode = resolvedModes.find((item) => item.id === mode) || resolvedModes[1];
+  const configsById = useMemo(
+    () => Object.fromEntries(selectedQuestions.map((question) => [question.id, configs[question.id] || createEmptyConfig()])),
+    [configs, selectedQuestions],
+  );
 
-  const toggleQuestion = (id) => {
-    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
-  };
+  const allFilteredSelected = useMemo(
+    () => filteredQuestions.length > 0 && filteredQuestions.every((item) => selectedIds.includes(item.id)),
+    [filteredQuestions, selectedIds],
+  );
 
-  const handleGenerate = async () => {
-    if (selectedQuestions.length === 0) return;
-    setIsGenerating(true);
-    setError("");
-    try {
-      const data = await createExport({
-        title: `打印重做包-${new Date().toISOString().slice(0, 10)}`,
-        mode: "practice_sheet",
-        hide_answers: hideAnswers,
-        question_items: selectedQuestions.map((question) => ({
-          title: question.title,
-          content: question.content,
-          subject: question.subject,
-          category: question.category,
-          image_url: question.imageUrl || undefined,
-        })),
-      });
-      setExportData(data);
-      setIsDone(true);
-    } catch (err) {
-      setError(err?.message || "打印包生成失败");
-    } finally {
-      setIsGenerating(false);
+  const generatingCount = useMemo(
+    () => selectedQuestions.filter((question) => (configs[question.id] || createEmptyConfig()).loading).length,
+    [configs, selectedQuestions],
+  );
+
+  const aiEnabledCount = useMemo(
+    () => selectedQuestions.filter((question) => (configs[question.id] || createEmptyConfig()).gen).length,
+    [configs, selectedQuestions],
+  );
+
+  const aiReadyCount = useMemo(
+    () =>
+      selectedQuestions.reduce((total, question) => {
+        const config = configs[question.id] || createEmptyConfig();
+        if (!config.gen || config.items.length === 0) return total;
+        return total + config.items.filter((item) => item.selected !== false).length;
+      }, 0),
+    [configs, selectedQuestions],
+  );
+
+  const previewSourceKey = useMemo(
+    () => buildPreviewSourceKey(selectedQuestions, configs),
+    [configs, selectedQuestions],
+  );
+
+  const syncPreview = useCallback(() => {
+    setPreviewState((current) => {
+      if (current.sourceKey === previewSourceKey) return current;
+      return {
+        sourceKey: previewSourceKey,
+        items: buildPreviewItems(selectedQuestions, configs),
+      };
+    });
+  }, [configs, previewSourceKey, selectedQuestions]);
+
+  useEffect(() => {
+    if (step === 3) {
+      syncPreview();
     }
-  };
+  }, [step, syncPreview]);
 
-  const handlePrint = () => {
-    if (exportData?.download_url) {
-      window.open(exportData.download_url, "_blank", "noopener,noreferrer");
+  useEffect(() => {
+    setExportUrl("");
+  }, [answerMode, previewSourceKey]);
+
+  const previewItems = previewState.items;
+  const estimatedPages = useMemo(() => estimatePages(previewItems, answerMode), [answerMode, previewItems]);
+
+  const updateConfig = useCallback((questionId, updater) => {
+    setConfigs((previous) => {
+      const current = previous[questionId] || createEmptyConfig();
+      return {
+        ...previous,
+        [questionId]: updater(current),
+      };
+    });
+  }, []);
+
+  const handleToggleQuestion = useCallback((questionId, checked) => {
+    setSelectedIds((previous) => {
+      if (checked) {
+        if (previous.includes(questionId)) return previous;
+        return [...previous, questionId];
+      }
+      return previous.filter((item) => item !== questionId);
+    });
+    setPreviewState((current) => ({ ...current, sourceKey: "" }));
+  }, []);
+
+  const handleSelectAllFiltered = useCallback(() => {
+    setSelectedIds((previous) => {
+      const merged = new Set(previous);
+      filteredQuestions.forEach((item) => merged.add(item.id));
+      return Array.from(merged);
+    });
+    setPreviewState((current) => ({ ...current, sourceKey: "" }));
+  }, [filteredQuestions]);
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedIds([]);
+    setPreviewState((current) => ({ ...current, sourceKey: "" }));
+  }, []);
+
+  const handleGoStep = useCallback(
+    (targetStep) => {
+      if (!studentId) {
+        toast.error("请先登录后再使用打印重做包");
+        navigate("/login");
+        return;
+      }
+
+      if (targetStep > 1 && selectedIds.length === 0) {
+        toast.error("请先至少勾选 1 道错题");
+        return;
+      }
+
+      if (targetStep === 3 && generatingCount > 0) {
+        toast.error("仍有题目正在生成，请等待后再进入预览");
+        return;
+      }
+
+      if (targetStep === 3) {
+        syncPreview();
+      }
+
+      setStep(targetStep);
+    },
+    [generatingCount, navigate, selectedIds.length, studentId, syncPreview],
+  );
+
+  const handleGenerateVariants = useCallback(
+    async (questionId) => {
+      const question = questions.find((item) => item.id === questionId);
+      if (!question) return;
+
+      updateConfig(questionId, (current) => ({
+        ...current,
+        gen: true,
+        loading: true,
+        editingPrompt: false,
+        error: "",
+      }));
+
+      try {
+        const current = configs[questionId] || createEmptyConfig();
+        const response = await generateVariantsForQuestion(question.rawId, {
+          count: 2,
+          prompt: String(current.prompt || DEFAULT_PROMPT).trim() || DEFAULT_PROMPT,
+          include_images: question.hasImg,
+        });
+        const items = (response?.items || response?.variants || [])
+          .map((item, index) => normalizeVariantItem(item, questionId, index))
+          .filter((item) => String(item.text || "").trim());
+
+        if (items.length === 0) {
+          throw new Error("后端未返回可用的 AI 练习题");
+        }
+
+        updateConfig(questionId, (draft) => ({
+          ...draft,
+          gen: true,
+          loading: false,
+          editingPrompt: false,
+          error: "",
+          prompt: response?.used_prompt || draft.prompt || DEFAULT_PROMPT,
+          items,
+        }));
+
+        setPreviewState((current) => ({ ...current, sourceKey: "" }));
+        toast.success("AI 同类题已生成");
+      } catch (err) {
+        updateConfig(questionId, (current) => ({
+          ...current,
+          gen: true,
+          loading: false,
+          error: err?.message || "AI 生成失败",
+        }));
+        toast.error(err?.message || "AI 生成失败");
+      }
+    },
+    [configs, questions, updateConfig],
+  );
+
+  const handleToggleAi = useCallback(
+    (questionId, enabled) => {
+      if (!enabled) {
+        updateConfig(questionId, (current) => ({
+          ...current,
+          gen: false,
+          loading: false,
+          editingPrompt: false,
+          error: "",
+        }));
+        setPreviewState((current) => ({ ...current, sourceKey: "" }));
+        return;
+      }
+
+      const current = configs[questionId] || createEmptyConfig();
+      if (current.items.length > 0) {
+        updateConfig(questionId, (draft) => ({
+          ...draft,
+          gen: true,
+          error: "",
+        }));
+        setPreviewState((stateDraft) => ({ ...stateDraft, sourceKey: "" }));
+        return;
+      }
+
+      handleGenerateVariants(questionId);
+    },
+    [configs, handleGenerateVariants, updateConfig],
+  );
+
+  const handleToggleVariantSelection = useCallback((questionId, variantId, selected) => {
+    updateConfig(questionId, (current) => {
+      const items = current.items.map((item) =>
+        item.id === variantId ? { ...item, selected } : item,
+      );
+      return { ...current, items };
+    });
+    setPreviewState((current) => ({ ...current, sourceKey: "" }));
+  }, [updateConfig]);
+
+  const handleRemoveVariant = useCallback((questionId, variantId) => {
+    updateConfig(questionId, (current) => ({
+      ...current,
+      items: current.items.filter((item) => item.id !== variantId),
+    }));
+    setPreviewState((current) => ({ ...current, sourceKey: "" }));
+  }, [updateConfig]);
+
+  const handlePromptChange = useCallback((questionId, value) => {
+    updateConfig(questionId, (current) => ({
+      ...current,
+      prompt: value,
+    }));
+  }, [updateConfig]);
+
+  const handleOpenPromptEditor = useCallback((questionId) => {
+    updateConfig(questionId, (current) => ({
+      ...current,
+      editingPrompt: true,
+    }));
+  }, [updateConfig]);
+
+  const handleClosePromptEditor = useCallback((questionId) => {
+    updateConfig(questionId, (current) => ({
+      ...current,
+      editingPrompt: false,
+    }));
+  }, [updateConfig]);
+
+  const handleConfirmPrompt = useCallback(
+    async (questionId) => {
+      await handleGenerateVariants(questionId);
+    },
+    [handleGenerateVariants],
+  );
+
+  const handleMovePreviewItem = useCallback((itemId, direction) => {
+    setPreviewState((current) => {
+      const sourceIndex = current.items.findIndex((item) => item.id === itemId);
+      const targetIndex = sourceIndex + direction;
+      if (sourceIndex < 0 || targetIndex < 0 || targetIndex >= current.items.length) return current;
+      const nextItems = [...current.items];
+      const [item] = nextItems.splice(sourceIndex, 1);
+      nextItems.splice(targetIndex, 0, item);
+      return { ...current, items: nextItems };
+    });
+  }, []);
+
+  const handleDeletePreviewItem = useCallback((itemId) => {
+    setPreviewState((current) => ({
+      ...current,
+      items: current.items.filter((item) => item.id !== itemId),
+    }));
+  }, []);
+
+  const handleReorderPreviewItems = useCallback((fromId, toId) => {
+    if (!fromId || !toId || fromId === toId) return;
+
+    setPreviewState((current) => {
+      const sourceIndex = current.items.findIndex((item) => item.id === fromId);
+      const targetIndex = current.items.findIndex((item) => item.id === toId);
+      if (sourceIndex < 0 || targetIndex < 0) return current;
+      const nextItems = [...current.items];
+      const [item] = nextItems.splice(sourceIndex, 1);
+      nextItems.splice(targetIndex, 0, item);
+      return { ...current, items: nextItems };
+    });
+  }, []);
+
+  const handleExport = useCallback(async () => {
+    if (previewItems.length === 0) {
+      toast.error("当前没有可导出的题目");
       return;
     }
-    window.print();
-  };
+
+    setExporting(true);
+
+    try {
+      const payload = buildPrintExportPayload({
+        previewItems,
+        answerMode,
+        student,
+      });
+      const response = await createPrintPackExport(payload);
+      const downloadUrl = resolveAssetUrl(response?.download_url || response?.url || "");
+
+      if (!downloadUrl) {
+        throw new Error("导出成功，但未返回下载地址");
+      }
+
+      setExportUrl(downloadUrl);
+      window.open(downloadUrl, "_blank", "noopener,noreferrer");
+      toast.success("PDF 已生成");
+    } catch (err) {
+      toast.error(err?.message || "导出 PDF 失败");
+    } finally {
+      setExporting(false);
+    }
+  }, [answerMode, previewItems, student]);
 
   if (!studentId) {
     return (
-      <div className="mx-auto max-w-2xl space-y-4 pb-4 pt-6">
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          请先登录后再生成重做打印包。
+      <div className="mx-auto max-w-2xl space-y-4 py-8">
+        <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-800">
+          当前没有有效登录态，无法加载真实错题与 AI 生成接口。
         </div>
-        <button onClick={() => navigate("/login")} className="btn-primary">
+        <button
+          type="button"
+          onClick={() => navigate("/login")}
+          className="inline-flex h-12 items-center justify-center rounded-2xl bg-indigo-600 px-5 text-sm font-bold text-white"
+        >
           去登录
         </button>
       </div>
@@ -169,165 +586,81 @@ export default function PrintPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 pb-4">
-      <div className="pt-2 pb-2">
-        <h1 className="text-3xl font-black tracking-tight text-gray-900">打印重做包</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-500">
-          录入、整理和打印共用一套错题数据。手机上选题也没问题，但电脑端更适合同时看题目、设置排版和直接导出 PDF。
-        </p>
-      </div>
+    <div className="print-workbench-page print-workbench-page-with-fixed-bar space-y-6">
+      <section className="print-workbench-steps-wrap print-workbench-screen-only rounded-[16px] border border-[#F0F0F0] bg-white px-5 py-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+        <PrintWorkbenchStepper currentStep={step} onStepClick={handleGoStep} />
+      </section>
 
-      {error ? <div className="workspace-alert error">{error}</div> : null}
-      {loading ? <div className="workspace-alert">正在加载真实错题...</div> : null}
+      {step === STEP_META[0].id ? (
+        <SelectQuestionsStep
+          loading={loading}
+          error={error}
+          questions={questions}
+          filteredQuestions={filteredQuestions}
+          selectedIds={selectedIds}
+          search={search}
+          onSearchChange={setSearch}
+          onToggleQuestion={handleToggleQuestion}
+          onNext={() => handleGoStep(2)}
+          onRefresh={refreshQuestions}
+        />
+      ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <section className="space-y-6">
-          <div className="rounded-3xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
-            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <span className="text-sm font-medium text-gray-900">选择进入重做包的错题</span>
-              <span className="text-sm text-gray-500">已选 {selectedQuestions.length} 题</span>
-            </div>
-            <div className="space-y-2">
-              {questions.length === 0 ? (
-                <div className="rounded-2xl bg-gray-50 p-4 text-sm text-gray-500">当前还没有可打印的真实错题。</div>
-              ) : (
-                questions.map((question, index) => {
-                  const checked = selectedIds.includes(question.id);
-                  return (
-                    <label
-                      key={question.id}
-                      className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-3 transition ${
-                        checked ? "border-indigo-300 bg-indigo-50" : "border-gray-200 bg-gray-50"
-                      }`}
-                    >
-                      <input type="checkbox" checked={checked} onChange={() => toggleQuestion(question.id)} className="mt-1" />
-                      <span className="mt-0.5 text-xs font-medium text-gray-500">{index + 1}.</span>
-                      <div className="min-w-0 flex-1">
-                        <div className="mb-1 flex flex-wrap items-center gap-2">
-                          <span className="rounded bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-600">{question.subject}</span>
-                          <span className="text-xs text-gray-500">{question.term || "未分期"}</span>
-                          <span className="text-xs text-gray-500">{question.category}</span>
-                        </div>
-                        <p className="text-sm font-medium text-gray-900">{question.title}</p>
-                        {question.imageUrl ? (
-                          <div className="mt-2 overflow-hidden rounded-xl border border-gray-100 bg-white">
-                            <img src={question.imageUrl} alt={question.imageName || question.title} className="max-h-56 w-full object-contain" />
-                          </div>
-                        ) : null}
-                        <p className="mt-1 line-clamp-2 text-sm text-gray-700">{question.content}</p>
-                      </div>
-                    </label>
-                  );
-                })
-              )}
-            </div>
-          </div>
+      {step === STEP_META[1].id ? (
+        <PracticeConfigStep
+          selectedQuestions={selectedQuestions}
+          answerMode={answerMode}
+          configsById={configsById}
+          generatingCount={generatingCount}
+          aiEnabledCount={aiEnabledCount}
+          aiReadyCount={aiReadyCount}
+          onBack={() => handleGoStep(1)}
+          onNext={() => handleGoStep(3)}
+          onAnswerModeChange={setAnswerMode}
+          onToggleAi={handleToggleAi}
+          onToggleVariantSelection={handleToggleVariantSelection}
+          onRemoveVariant={handleRemoveVariant}
+          onPromptChange={handlePromptChange}
+          onOpenPromptEditor={handleOpenPromptEditor}
+          onClosePromptEditor={handleClosePromptEditor}
+          onConfirmPrompt={handleConfirmPrompt}
+          onRetryGenerate={handleGenerateVariants}
+        />
+      ) : null}
 
-          <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4">
-            <p className="text-sm leading-6 text-amber-800">
-              当前导出已经会调用真实后端生成 PDF。完成后可直接打开文件，也可以顺手去回填这批题目的线下重做结果。
-            </p>
-          </div>
-        </section>
+      {step === STEP_META[2].id ? (
+        <PreviewArrangeStep
+          previewItems={previewItems}
+          answerMode={answerMode}
+          estimatedPages={estimatedPages}
+          exporting={exporting}
+          exportUrl={exportUrl}
+          onBack={() => handleGoStep(2)}
+          onExport={handleExport}
+          onMoveItem={handleMovePreviewItem}
+          onDeleteItem={handleDeletePreviewItem}
+          onReorderItems={handleReorderPreviewItems}
+        />
+      ) : null}
 
-        <aside className="space-y-4 xl:sticky xl:top-8 xl:self-start">
-          <section className="rounded-3xl border border-slate-900 bg-slate-900 p-5 text-white shadow-[0_18px_36px_rgba(15,23,42,0.18)]">
-            <h2 className="text-lg font-bold">排版工作区</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-300">
-              建议在电脑端完成最终排版和导出，边选题边预估打印包规模，减少来回切换。
-            </p>
-            <div className="mt-4 space-y-3">
-              <SummaryRow label="已选题目" value={`${selectedQuestions.length} 题`} tone="accent" />
-              <SummaryRow label="当前模式" value={currentMode.label} />
-              <SummaryRow label="答案显示" value={hideAnswers ? "隐藏参考答案" : "保留参考答案"} tone="success" />
-            </div>
-          </section>
-
-          <section className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm">
-            <h3 className="mb-4 text-sm font-semibold text-gray-900">选择打印模式</h3>
-            <div className="space-y-2">
-              {resolvedModes.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setMode(item.id)}
-                  className={`w-full rounded-2xl border-2 p-4 text-left transition-all ${
-                    mode === item.id ? "border-indigo-600 bg-indigo-50" : "border-gray-200 bg-white hover:border-indigo-200"
-                  }`}
-                >
-                  <div className="mb-1 flex items-center gap-2">
-                    <span className={`font-semibold ${mode === item.id ? "text-indigo-900" : "text-gray-900"}`}>{item.label}</span>
-                    <span className="text-xs text-gray-500">{item.desc}</span>
-                  </div>
-                  <div className="text-sm text-gray-600">本次预计打印 {item.count} 道题</div>
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <div className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
-            <button onClick={() => setShowSettings((value) => !value)} className="flex w-full items-center justify-between px-5 py-4">
-              <span className="text-sm font-medium text-gray-900">打印设置</span>
-              <ChevronDown className={`h-5 w-5 text-gray-400 transition-transform ${showSettings ? "rotate-180" : ""}`} />
-            </button>
-            {showSettings ? (
-              <div className="space-y-4 border-t border-gray-100 px-5 pt-4 pb-5">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-700">隐藏参考答案</span>
-                  <button
-                    onClick={() => setHideAnswers((value) => !value)}
-                    className={`relative h-6 w-12 rounded-full transition-colors ${hideAnswers ? "bg-indigo-600" : "bg-gray-300"}`}
-                  >
-                    <div className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${hideAnswers ? "left-6" : "left-0.5"}`} />
-                  </button>
-                </div>
-              </div>
-            ) : null}
-          </div>
-
-          {!isDone ? (
-            <button
-              onClick={handleGenerate}
-              disabled={isGenerating || selectedQuestions.length === 0}
-              className="flex w-full items-center justify-center gap-2 rounded-3xl bg-indigo-600 py-4 font-semibold text-white shadow-lg transition-all hover:bg-indigo-700 disabled:bg-gray-400"
-            >
-              {isGenerating ? <span className="animate-pulse">正在准备打印包...</span> : <><Printer className="h-5 w-5" /> 生成打印重做包</>}
-            </button>
-          ) : (
-            <div className="space-y-3 rounded-3xl border border-gray-100 bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-center gap-2 py-2 font-medium text-emerald-600">
-                <CheckCircle2 className="h-5 w-5" />
-                打印重做包已就绪
-              </div>
-              <button onClick={handlePrint} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-4 font-semibold text-white shadow-lg transition-all hover:bg-indigo-700">
-                <Printer className="h-5 w-5" />
-                {exportData?.download_url ? "下载 / 打开 PDF" : "立即打印"}
-              </button>
-              {exportData?.download_url ? (
-                <a
-                  href={exportData.download_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block w-full rounded-2xl border-2 border-gray-200 bg-white py-3 text-center font-medium text-gray-700 transition-all hover:bg-gray-50"
-                >
-                  打开导出文件
-                </a>
-              ) : null}
-              {selectedQuestions.length > 0 ? (
-                <button
-                  onClick={() => navigate(`/practice/${selectedQuestions[0].id}`)}
-                  className="w-full rounded-2xl border-2 border-indigo-200 bg-indigo-50 py-3 font-medium text-indigo-700 transition-all hover:bg-indigo-100"
-                >
-                  去回填第一道题的练习结果
-                </button>
-              ) : null}
-              <button onClick={() => setIsDone(false)} className="w-full rounded-2xl border-2 border-gray-200 bg-white py-3 font-medium text-gray-700 transition-all hover:bg-gray-50">
-                重新设置
-              </button>
-            </div>
-          )}
-        </aside>
-      </div>
+      <PrintBottomBar
+        step={step}
+        selectedCount={selectedQuestions.length}
+        filteredCount={filteredQuestions.length}
+        allFilteredSelected={allFilteredSelected}
+        aiReadyCount={aiReadyCount}
+        generatingCount={generatingCount}
+        previewCount={previewItems.length}
+        estimatedPages={estimatedPages}
+        answerMode={answerMode}
+        exportUrl={exportUrl}
+        exporting={exporting}
+        onSelectAll={handleSelectAllFiltered}
+        onClearSelection={handleClearSelection}
+        onBack={() => handleGoStep(Math.max(1, step - 1))}
+        onNext={() => handleGoStep(Math.min(3, step + 1))}
+        onExport={handleExport}
+      />
     </div>
   );
 }

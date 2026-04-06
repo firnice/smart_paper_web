@@ -520,9 +520,7 @@ export default function useComposer({
             source: "manual",
             notes: notes || undefined,
             image_url: imageData || undefined,
-            image_name: imageData ? resolveImageName(question, sourceImage.name) : undefined,
             original_image_url: sourceImage.data || undefined,
-            original_image_name: sourceImage.name || undefined,
           });
           rememberOriginalImageForQuestion({
             id: createdItem?.id,

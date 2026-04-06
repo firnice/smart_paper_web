@@ -44,7 +44,7 @@ export function mapWrongQuestionItem(item) {
     title: item?.title,
     content: item?.content,
     imageData: resolveAssetUrl(item?.original_image_url),
-    imageName: item?.original_image_name || "",
+    imageName: "",
   });
 
   return {
@@ -66,8 +66,6 @@ export function mapWrongQuestionItem(item) {
     error_count: Number(item?.error_count || 0),
     review_count: 0,
     image_data: resolveAssetUrl(item?.image_url),
-    image_name: item?.image_name || "",
     original_image_data: originalImage?.data || "",
-    original_image_name: originalImage?.name || "",
   };
 }

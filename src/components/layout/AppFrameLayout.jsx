@@ -9,48 +9,11 @@ const NAV_ITEMS = [
   { to: "/profile", label: "我的", shortLabel: "我的", Icon: User },
 ];
 
-function getRouteMeta(pathname) {
-  if (pathname.startsWith("/capture")) {
-    return {
-      title: "录入中心",
-      subtitle: "手机拍照更顺手，电脑上传扫描件和整页图片更适合批量整理。",
-    };
-  }
-  if (pathname.startsWith("/print")) {
-    return {
-      title: "打印重做包",
-      subtitle: "同一批错题可在手机上发起，在电脑上排版、导出与打印。",
-    };
-  }
-  if (pathname.startsWith("/analysis")) {
-    return {
-      title: "学习分析",
-      subtitle: "查看近期错题分布、掌握趋势和需要优先处理的内容。",
-    };
-  }
-  if (pathname.startsWith("/profile")) {
-    return {
-      title: "用户中心",
-      subtitle: "统一管理当前账号信息、学习档案和使用偏好。",
-    };
-  }
-  return {
-    title: "错题本",
-    subtitle: "录入、整理、打印共用一套数据，跨设备直接接力。",
-  };
-}
-
 export default function AppFrameLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const session = readStudentSession();
   const student = session?.student || null;
-  const routeMeta = getRouteMeta(location.pathname);
-  const isWorkbenchRoute = location.pathname.startsWith("/workspace") || location.pathname.startsWith("/capture");
-
-  const onOpenCapture = () => {
-    navigate("/capture", { state: { openComposer: true } });
-  };
 
   const isItemActive = (to) => {
     if (to === "/workspace") {
@@ -107,49 +70,8 @@ export default function AppFrameLayout() {
         </aside>
 
         <div className="min-w-0">
-          <header className="hidden border-b border-slate-200/80 bg-white/90 backdrop-blur lg:block">
-            <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-indigo-500">Smart Paper</p>
-                <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-900">{routeMeta.title}</h2>
-                <p className="mt-1 text-sm text-slate-500">{routeMeta.subtitle}</p>
-              </div>
-              <div className="flex items-center gap-3">
-                {isWorkbenchRoute ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={onOpenCapture}
-                      className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 px-4 py-3 text-sm font-bold text-white shadow-[0_12px_24px_rgba(99,102,241,0.24)] transition active:scale-[0.98]"
-                    >
-                      <Camera className="h-4 w-4" />
-                      开始录入
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => navigate("/print")}
-                      className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-indigo-200 hover:text-indigo-700"
-                    >
-                      <Printer className="h-4 w-4" />
-                      去打印
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={onOpenCapture}
-                    className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-indigo-200 hover:text-indigo-700"
-                  >
-                    <Camera className="h-4 w-4" />
-                    录入错题
-                  </button>
-                )}
-              </div>
-            </div>
-          </header>
-
           <main className="pb-[88px] lg:pb-8">
-            <div className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 lg:px-10 lg:py-8">
+            <div className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 lg:px-10 lg:py-6">
               <Outlet />
             </div>
           </main>

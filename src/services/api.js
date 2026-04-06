@@ -180,6 +180,16 @@ export async function createExport(payload) {
   });
 }
 
+export async function createPrintPackExport(payload) {
+  return requestJson("/api/print-pack/export", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function listUsers(params = {}) {
   return requestJson("/api/users", {}, params);
 }
@@ -305,11 +315,25 @@ export async function studentLogin(payload) {
 }
 
 // ---- 举一反三 ----
-export async function generateVariantsForQuestion(wrongQuestionId, count = 3) {
+export async function generateVariantsForQuestion(wrongQuestionId, options = {}) {
+  const normalized = typeof options === "number" ? { count: options } : (options || {});
+  const payload = {
+    wrong_question_id: wrongQuestionId,
+    count: normalized.count ?? 3,
+  };
+
+  if (normalized.prompt !== undefined) {
+    payload.prompt = normalized.prompt;
+  }
+
+  if (normalized.include_images !== undefined) {
+    payload.include_images = normalized.include_images;
+  }
+
   return requestJson("/api/variants/generate-for-question", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ wrong_question_id: wrongQuestionId, count }),
+    body: JSON.stringify(payload),
   });
 }
 

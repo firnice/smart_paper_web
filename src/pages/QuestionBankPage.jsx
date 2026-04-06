@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Search } from "lucide-react";
 import { listWrongQuestions, resolveAssetUrl, createStudyRecord, updateWrongQuestion, generateVariantsForQuestion } from "../services/api.js";
 import { readStudentSession } from "../utils/studentSession.js";
-import { getDefaultSchoolTerm, demoGenerateVariants } from "../services/studentDemo.js";
+import { getDefaultSchoolTerm } from "../services/studentDemo.js";
 import PracticeModal from "../components/practice/PracticeModal.jsx";
 import VariantModal from "../components/practice/VariantModal.jsx";
 import PracticeSession from "../components/practice/PracticeSession.jsx";
@@ -39,7 +39,6 @@ function mapQuestion(item) {
     recurringCount: Number(item.error_count || 0),
     imageUrl: resolveAssetUrl(item.image_url),
     image_data: resolveAssetUrl(item.image_url),
-    imageName: item.image_name || "",
     term: inferTerm(item.first_error_date || item.created_at, item.grade),
     status: item.status || "new",
   };
@@ -144,13 +143,7 @@ export default function QuestionBankPage() {
   );
 
   // 举一反三生成函数
-  const generateFn = useCallback(async (wrongQuestionId) => {
-    try {
-      return await generateVariantsForQuestion(wrongQuestionId);
-    } catch {
-      return demoGenerateVariants(wrongQuestionId);
-    }
-  }, []);
+  const generateFn = useCallback((wrongQuestionId) => generateVariantsForQuestion(wrongQuestionId), []);
 
   // 批量重做完成
   const handleBatchComplete = useCallback(
