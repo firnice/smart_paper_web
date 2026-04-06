@@ -63,6 +63,40 @@
     #edeef3;
 }
 
+.print-workbench-view-switch {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.print-workbench-view-switch button {
+  height: 34px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.print-workbench-view-switch button:hover {
+  background: #f8fafc;
+  color: #312e81;
+}
+
+.print-workbench-view-switch button.is-active {
+  background: #eef2ff;
+  color: #4338ca;
+  box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.12);
+}
+
 .print-workbench-sheet {
   width: 794px;
   min-height: 1123px;

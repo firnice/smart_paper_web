@@ -1,11 +1,10 @@
 import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { BarChart3, BookOpen, Camera, Printer, User } from "lucide-react";
+import { BookOpen, Camera, Printer, User } from "lucide-react";
 import { readStudentSession } from "../../utils/studentSession.js";
 
 const NAV_ITEMS = [
   { to: "/workspace", label: "错题本", shortLabel: "错题本", Icon: BookOpen },
   { to: "/print", label: "打印", shortLabel: "打印", Icon: Printer },
-  { to: "/analysis", label: "分析", shortLabel: "分析", Icon: BarChart3 },
   { to: "/profile", label: "我的", shortLabel: "我的", Icon: User },
 ];
 

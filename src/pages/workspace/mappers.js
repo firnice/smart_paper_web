@@ -38,7 +38,7 @@ export function mapWrongQuestionItem(item) {
   const reasons = Array.isArray(item?.error_reasons) ? item.error_reasons : [];
   const firstReason = reasons[0]?.name || "待分析";
   const subjectName = item?.subject?.name || "未分类学科";
-  const term = inferSchoolTerm(item?.first_error_date || item?.created_at, item?.grade);
+  const term = item?.term?.name || inferSchoolTerm(item?.first_error_date || item?.created_at, item?.grade);
   const originalImage = resolveOriginalImageForQuestion({
     id: item?.id,
     title: item?.title,

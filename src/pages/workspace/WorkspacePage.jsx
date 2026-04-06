@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { getDefaultSchoolTerm, getTermOptions } from "../../services/studentDemo.js";
+import { useTerm } from "../../context/TermContext.jsx";
 import {
   deleteWrongQuestion,
   getStatisticsOverview,
@@ -25,15 +25,15 @@ export default function WorkspacePage({ defaultOpenComposer = false, pageMode = 
   const autoOpenedRef = useRef(false);
 
   const [session, setSession] = useState(() => readStudentSession());
+  const { currentTerm } = useTerm();
   const [stats, setStats] = useState(null);
   const [wrongQuestions, setWrongQuestions] = useState([]);
   const [subjectOptions, setSubjectOptions] = useState([]);
-  const [termOptions, setTermOptions] = useState([]);
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [errorReasonOptions, setErrorReasonOptions] = useState([]);
   const [editForm, setEditForm] = useState(EDIT_INITIAL);
   const [editingItem, setEditingItem] = useState(null);
-  const [filters, setFilters] = useState({ keyword: "", subject: "", term: "", status: "" });
+  const [filters, setFilters] = useState({ keyword: "", subject: "", status: "" });
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -69,27 +69,25 @@ export default function WorkspacePage({ defaultOpenComposer = false, pageMode = 
     const wrongRes = await listWrongQuestions({
       student_id: studentId,
       subject_id: selectedSubjectId,
+      term_id: currentTerm?.id || undefined,
       status: filters.status || undefined,
       keyword: filters.keyword || undefined,
       limit: 100,
     });
 
-    const mappedItems = (wrongRes?.items || [])
-      .map(mapWrongQuestionItem)
-      .filter((item) => !filters.term || item.term === filters.term);
+    const mappedItems = (wrongRes?.items || []).map(mapWrongQuestionItem);
 
     let statsRes = null;
     try {
-      statsRes = await getStatisticsOverview(studentId);
+      statsRes = await getStatisticsOverview(studentId, { term_id: currentTerm?.id || undefined });
     } catch {}
 
     setStats(buildStats(statsRes, mappedItems));
     setWrongQuestions(mappedItems);
     setSubjectOptions(Array.from(new Set(mappedItems.map((item) => item.subject).filter(Boolean))));
-    setTermOptions(Array.from(new Set(mappedItems.map((item) => item.term).filter(Boolean))));
     setCategoryOptions(categoriesRes?.items || []);
     setErrorReasonOptions(reasonsRes?.items || []);
-  }, [studentId, filters]);
+  }, [studentId, filters, currentTerm?.id]);
 
   const composer = useComposer({
     studentId,
@@ -111,16 +109,6 @@ export default function WorkspacePage({ defaultOpenComposer = false, pageMode = 
       setFailure(err?.message || "学生错题本加载失败");
     });
   }, [studentId, navigate, refresh]);
-
-  // 当 profile.grade 可用后，给 form.term 设置默认值
-  useEffect(() => {
-    const grade = profile.grade;
-    if (!grade) return;
-    composer.setForm((prev) => {
-      if (prev.term) return prev;
-      return { ...prev, term: getDefaultSchoolTerm(null, grade) };
-    });
-  }, [profile.grade]);
 
   // 响应中央 FAB 按钮
   useEffect(() => {
@@ -216,13 +204,9 @@ export default function WorkspacePage({ defaultOpenComposer = false, pageMode = 
   if (!session?.student) return null;
 
   const student = session.student;
-  const gradeTermOptions = getTermOptions(profile.grade);
-  const formTermOptions = Array.from(new Set([...gradeTermOptions, ...termOptions, composer.form.term].filter(Boolean)));
   const filterSubjectOptions = Array.from(
     new Set([...DEFAULT_SUBJECT_OPTIONS, ...subjectOptions, composer.form.subject].filter(Boolean)),
   );
-  // Only show terms that actually have questions (termOptions comes from loaded wrong questions)
-  const filterTermOptions = Array.from(new Set(termOptions.filter(Boolean)));
 
   return (
     <div className="space-y-6 pb-4">
@@ -237,8 +221,6 @@ export default function WorkspacePage({ defaultOpenComposer = false, pageMode = 
         filters={filters}
         setFilters={setFilters}
         filterSubjectOptions={filterSubjectOptions}
-        filterTermOptions={filterTermOptions}
-        defaultTerm={getDefaultSchoolTerm(null, profile.grade)}
         onChangeStatus={onChangeStatus}
         onToggleBookmark={onToggleBookmark}
         onStartEdit={onStartEdit}

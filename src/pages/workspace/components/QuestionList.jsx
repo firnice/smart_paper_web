@@ -6,8 +6,6 @@ export default function QuestionList({
   filters,
   setFilters,
   filterSubjectOptions,
-  filterTermOptions,
-  defaultTerm,
   onChangeStatus,
   onToggleBookmark,
   onStartEdit,
@@ -27,8 +25,6 @@ export default function QuestionList({
         filters={filters}
         setFilters={setFilters}
         filterSubjectOptions={filterSubjectOptions}
-        filterTermOptions={filterTermOptions}
-        defaultTerm={defaultTerm}
       />
 
       {wrongQuestions.length === 0 ? (

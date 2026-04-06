@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { createPrintPackExport, generateVariantsForQuestion, listWrongQuestions, resolveAssetUrl } from "../services/api.js";
 import { readStudentSession } from "../utils/studentSession.js";
+import { useTerm } from "../context/TermContext.jsx";
 import PrintWorkbenchStepper from "./print/components/PrintWorkbenchStepper.jsx";
 import SelectQuestionsStep from "./print/components/SelectQuestionsStep.jsx";
 import PracticeConfigStep from "./print/components/PracticeConfigStep.jsx";
@@ -20,6 +21,12 @@ import {
   normalizeVariantItem,
 } from "./print/helpers.js";
 import "../styles/print-workbench.css";
+
+const QUESTION_VIEW_MODES = [
+  { id: "full", title: "全信息展示" },
+  { id: "compact", title: "简略信息" },
+  { id: "list", title: "列表形式" },
+];
 
 function resolveInitialSelection(items, requestedIds, previousIds) {
   const available = new Set(items.map((item) => item.id));
@@ -195,8 +202,12 @@ export default function PrintPage() {
   const studentId = student?.id;
   const studentGrade = student?.student_profile?.grade || "";
 
+  const { currentTerm } = useTerm();
+
   const [step, setStep] = useState(1);
   const [search, setSearch] = useState("");
+  const [subjectFilter, setSubjectFilter] = useState("");
+  const [questionViewMode, setQuestionViewMode] = useState(QUESTION_VIEW_MODES[0].id);
   const [questions, setQuestions] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [answerMode, setAnswerMode] = useState(ANSWER_MODES[2].id);
@@ -222,7 +233,11 @@ export default function PrintPage() {
     setError("");
 
     try {
-      const response = await listWrongQuestions({ student_id: studentId, limit: 100 });
+      const response = await listWrongQuestions({
+        student_id: studentId,
+        term_id: currentTerm?.id || undefined,
+        limit: 100,
+      });
       const mapped = (response?.items || []).map((item) => mapWrongQuestionToPrintQuestion(item, studentGrade));
       setQuestions(mapped);
       setSelectedIds((previousIds) => resolveInitialSelection(mapped, requestedIds, previousIds));
@@ -231,7 +246,7 @@ export default function PrintPage() {
     } finally {
       setLoading(false);
     }
-  }, [requestedIds, studentGrade, studentId]);
+  }, [requestedIds, studentGrade, studentId, currentTerm?.id]);
 
   useEffect(() => {
     if (!studentId) return;
@@ -243,17 +258,28 @@ export default function PrintPage() {
     [questions, selectedIds],
   );
 
+  const subjectOptions = useMemo(
+    () => Array.from(new Set(questions.map((q) => q.subject).filter(Boolean))),
+    [questions],
+  );
+
   const filteredQuestions = useMemo(() => {
+    let result = questions;
+    if (subjectFilter) {
+      result = result.filter((item) => item.subject === subjectFilter);
+    }
     const keyword = search.trim().toLowerCase();
-    if (!keyword) return questions;
-    return questions.filter((item) => {
-      const source = [item.subject, item.grade, item.title, item.content, item.category, item.errorReason, item.keywords]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return source.includes(keyword);
-    });
-  }, [questions, search]);
+    if (keyword) {
+      result = result.filter((item) => {
+        const source = [item.subject, item.grade, item.title, item.content, item.category, item.errorReason, item.keywords]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return source.includes(keyword);
+      });
+    }
+    return result;
+  }, [questions, search, subjectFilter]);
 
   const configsById = useMemo(
     () => Object.fromEntries(selectedQuestions.map((question) => [question.id, configs[question.id] || createEmptyConfig()])),
@@ -599,9 +625,14 @@ export default function PrintPage() {
           filteredQuestions={filteredQuestions}
           selectedIds={selectedIds}
           search={search}
+          subjectFilter={subjectFilter}
+          subjectOptions={subjectOptions}
+          viewMode={questionViewMode}
+          viewModes={QUESTION_VIEW_MODES}
           onSearchChange={setSearch}
+          onSubjectFilterChange={setSubjectFilter}
+          onViewModeChange={setQuestionViewMode}
           onToggleQuestion={handleToggleQuestion}
-          onNext={() => handleGoStep(2)}
           onRefresh={refreshQuestions}
         />
       ) : null}

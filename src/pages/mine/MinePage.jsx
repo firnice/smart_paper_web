@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { LogOut, TrendingUp, ChevronRight, Bell, BarChart2 } from "lucide-react";
+import { LogOut, TrendingUp, ChevronRight, Bell, BarChart2, BookOpen } from "lucide-react";
 import { getStatisticsOverview, listWrongQuestions } from "../../services/api.js";
 import { clearStudentSession, readStudentSession } from "../../utils/studentSession.js";
+import { useTerm } from "../../context/TermContext.jsx";
 import UserHeader from "./components/UserHeader.jsx";
 import StatsOverview from "./components/StatsOverview.jsx";
 import SubjectChart from "./components/SubjectChart.jsx";
@@ -36,18 +37,22 @@ export default function MinePage() {
   const profile = student?.student_profile || {};
   const studentId = student?.id;
 
+  const { allTerms, currentTerm, changeTerm, loading: termLoading } = useTerm();
+
   const [stats, setStats] = useState(null);
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const gradeTerms = useMemo(() => allTerms, [allTerms]);
 
   useEffect(() => {
     if (!studentId) return;
     let active = true;
     setLoading(true);
     Promise.all([
-      getStatisticsOverview(studentId),
-      listWrongQuestions({ student_id: studentId, limit: 6 }),
+      getStatisticsOverview(studentId, { term_id: currentTerm?.id || undefined }),
+      listWrongQuestions({ student_id: studentId, term_id: currentTerm?.id || undefined, limit: 6 }),
     ])
       .then(([statsRes, wrongRes]) => {
         if (!active) return;
@@ -57,7 +62,7 @@ export default function MinePage() {
       .catch((err) => { if (active) setError(err?.message || "加载失败"); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [studentId]);
+  }, [studentId, currentTerm?.id]);
 
   const masteryRate = useMemo(() => {
     const total = Number(stats?.total_wrong_questions || 0);
@@ -99,6 +104,38 @@ export default function MinePage() {
     <div className="space-y-4 pb-4">
       {/* User Profile Header */}
       <UserHeader student={student} profile={profile} />
+
+      {/* Term Selector */}
+      {gradeTerms.length > 0 && (
+        <div
+          className="rounded-2xl bg-white px-4 py-3"
+          style={{ boxShadow: "0 2px 10px rgba(0,0,0,0.06)", border: "1px solid rgba(0,0,0,0.04)" }}
+        >
+          <div className="mb-2 flex items-center gap-2">
+            <BookOpen className="h-4 w-4 text-indigo-500" />
+            <span className="text-[13px] font-semibold text-gray-700">当前学期</span>
+            {termLoading && <span className="text-[11px] text-gray-400">更新中...</span>}
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+            {gradeTerms.map((term) => (
+              <button
+                key={term.id}
+                type="button"
+                onClick={() => changeTerm(term.id)}
+                disabled={termLoading}
+                className="whitespace-nowrap rounded-full px-3 py-1.5 text-[13px] font-semibold transition"
+                style={
+                  currentTerm?.id === term.id
+                    ? { background: "#6366F1", color: "#fff", boxShadow: "0 2px 8px rgba(99,102,241,0.35)" }
+                    : { background: "#F3F4F6", color: "#6B7280" }
+                }
+              >
+                {term.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {error && <div className="rounded-xl bg-red-50 px-3 py-2 text-[13px] text-red-600">{error}</div>}
 

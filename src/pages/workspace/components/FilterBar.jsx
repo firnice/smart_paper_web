@@ -1,12 +1,7 @@
-import { useEffect } from "react";
+import { useTerm } from "../../../context/TermContext.jsx";
 
-export default function FilterBar({ filters, setFilters, filterSubjectOptions, filterTermOptions, defaultTerm }) {
-  // Set default term on first load when options arrive
-  useEffect(() => {
-    if (!filters.term && defaultTerm && filterTermOptions.includes(defaultTerm)) {
-      setFilters((prev) => ({ ...prev, term: defaultTerm }));
-    }
-  }, [defaultTerm, filterTermOptions.join(",")]);
+export default function FilterBar({ filters, setFilters, filterSubjectOptions }) {
+  const { currentTerm } = useTerm();
 
   const statusOptions = [
     { value: "", label: "全部" },
@@ -16,6 +11,20 @@ export default function FilterBar({ filters, setFilters, filterSubjectOptions, f
 
   return (
     <div className="mb-5 space-y-4 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4">
+      {/* Current term indicator */}
+      {currentTerm && (
+        <div className="flex items-center gap-2">
+          <span className="text-[12px] text-gray-400">当前学期</span>
+          <span
+            className="rounded-full px-2.5 py-0.5 text-[12px] font-semibold"
+            style={{ background: "#EEF2FF", color: "#6366F1" }}
+          >
+            {currentTerm.name}
+          </span>
+          <span className="text-[11px] text-gray-400">（在「我的」页面切换）</span>
+        </div>
+      )}
+
       {/* Segmented Control: 掌握状态 */}
       <div
         className="flex rounded-2xl p-1"
@@ -39,7 +48,7 @@ export default function FilterBar({ filters, setFilters, filterSubjectOptions, f
       </div>
 
       {/* Dropdowns Row */}
-      <div className="grid gap-3 lg:grid-cols-[220px_220px_minmax(0,1fr)]">
+      <div className="grid gap-3">
         <div className="relative flex-1">
           <select
             className="w-full appearance-none rounded-xl border border-gray-200 bg-white py-2.5 pl-3 pr-7 text-[13px] font-medium text-gray-700 outline-none"
@@ -50,23 +59,6 @@ export default function FilterBar({ filters, setFilters, filterSubjectOptions, f
             <option value="">全部学科</option>
             {filterSubjectOptions.map((s) => (
               <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-          <svg className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-          </svg>
-        </div>
-
-        <div className="relative flex-1">
-          <select
-            className="w-full appearance-none rounded-xl border border-gray-200 bg-white py-2.5 pl-3 pr-7 text-[13px] font-medium text-gray-700 outline-none"
-            style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}
-            value={filters.term}
-            onChange={(e) => setFilters((prev) => ({ ...prev, term: e.target.value }))}
-          >
-            <option value="">全部年级/学期</option>
-            {filterTermOptions.map((t) => (
-              <option key={t} value={t}>{t}</option>
             ))}
           </select>
           <svg className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" viewBox="0 0 20 20" fill="currentColor">

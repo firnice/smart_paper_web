@@ -120,6 +120,18 @@ export async function checkHealth() {
   return requestJson("/api/health");
 }
 
+export async function listSchoolTerms(params = {}) {
+  return requestJson("/api/school-terms", {}, params);
+}
+
+export async function setStudentCurrentTerm(userId, termId) {
+  return requestJson(`/api/users/${userId}/term`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ term_id: termId }),
+  });
+}
+
 export async function extractQuestions(file, options = {}) {
   const formData = new FormData();
   formData.append("file", file);
@@ -197,6 +209,14 @@ export async function listUsers(params = {}) {
 export async function createUser(payload) {
   return requestJson("/api/users", {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateUser(userId, payload) {
+  return requestJson(`/api/users/${userId}`, {
+    method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });

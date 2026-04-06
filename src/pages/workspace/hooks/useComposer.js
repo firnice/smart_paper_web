@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { getDefaultSchoolTerm } from "../../../services/studentDemo.js";
+import { useTerm } from "../../../context/TermContext.jsx";
 import {
   analyzeQuestion,
   createWrongQuestion,
@@ -99,8 +99,9 @@ export default function useComposer({
   setFailure,
 }) {
   const uploadInputRef = useRef(null);
+  const { currentTerm } = useTerm();
 
-  const [form, setForm] = useState({ term: "" });
+  const [form, setForm] = useState({});
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [step, setStep] = useState(1);
   const [sourceImage, setSourceImage] = useState({
@@ -512,7 +513,7 @@ export default function useComposer({
             content: question.text,
             subject_id: subject?.id,
             grade: question.grade || profile.grade || undefined,
-            term: form.term || getDefaultSchoolTerm(null, question.grade || profile.grade),
+            term_id: currentTerm?.id || undefined,
             difficulty: "medium",
             category_id: category?.id,
             error_reason_ids: selectedReasons.map((item) => item.id),
