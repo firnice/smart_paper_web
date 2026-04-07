@@ -10,7 +10,7 @@ function resolveApiBase() {
   if (typeof window !== "undefined" && window.location?.origin) {
     return trimTrailingSlash(window.location.origin);
   }
-  return "http://localhost:8000";
+  return "http://localhost:8100";
 }
 
 const API_BASE = resolveApiBase();
@@ -71,10 +71,10 @@ async function requestJson(path, options = {}, query = {}) {
       try {
         response = await fetch(buildUrl(path, query, fallbackBase), options);
       } catch {
-        throw new Error("无法连接后端服务，请确认后端已启动（默认 http://localhost:8000）");
+        throw new Error("无法连接后端服务，请确认后端已启动（默认 http://localhost:8100）");
       }
     } else {
-      throw new Error("无法连接后端服务，请确认后端已启动（默认 http://localhost:8000）");
+      throw new Error("无法连接后端服务，请确认后端已启动（默认 http://localhost:8100）");
     }
   }
 

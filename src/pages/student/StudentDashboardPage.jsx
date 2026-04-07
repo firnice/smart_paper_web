@@ -167,7 +167,7 @@ function normalizeOcrImageUrl(url) {
   if (value.startsWith("http://") || value.startsWith("https://") || value.startsWith("data:")) {
     return value;
   }
-  const base = String(import.meta.env.VITE_API_BASE || "http://localhost:8000").replace(/\/+$/, "");
+  const base = String(import.meta.env.VITE_API_BASE || "http://localhost:8100").replace(/\/+$/, "");
   return `${base}${value.startsWith("/") ? "" : "/"}${value}`;
 }
 
