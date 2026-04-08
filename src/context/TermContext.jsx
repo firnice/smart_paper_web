@@ -4,31 +4,34 @@ import { listSchoolTerms } from "../services/api.js";
 
 const TermContext = createContext(null);
 
+function inferTermFromTerms(terms) {
+  const grade = readStudentSession()?.student?.student_profile?.grade;
+  if (!grade || !terms.length) return null;
+  const month = new Date().getMonth() + 1;
+  const semester = [9, 10, 11, 12, 1].includes(month) ? "上" : "下";
+  return terms.find((t) => t.name === `${grade}${semester}`) || null;
+}
+
 export function TermProvider({ children }) {
   const [allTerms, setAllTerms] = useState([]);
   const [currentTerm, setCurrentTerm] = useState(null);
 
-  const session = readStudentSession();
-  const profile = session?.student?.student_profile || {};
-
   // Load all 12 terms once on mount
   useEffect(() => {
     listSchoolTerms()
-      .then((res) => setAllTerms(res?.items || []))
+      .then((res) => {
+        const terms = res?.items || [];
+        setAllTerms(terms);
+        // Infer on first load if session is already available
+        setCurrentTerm((prev) => prev || inferTermFromTerms(terms));
+      })
       .catch(() => {});
   }, []);
 
-  // Auto-infer from grade + today's date (only on first load, no persistence)
-  useEffect(() => {
-    if (!allTerms.length || currentTerm) return;
-    const grade = profile.grade;
-    if (!grade) return;
-    const month = new Date().getMonth() + 1;
-    const semester = [9, 10, 11, 12, 1].includes(month) ? "上" : "下";
-    const inferredName = `${grade}${semester}`;
-    const inferred = allTerms.find((t) => t.name === inferredName) || null;
-    setCurrentTerm(inferred);
-  }, [allTerms, profile.grade]);
+  // Called after login to trigger re-inference with the freshly saved session
+  const inferTerm = useCallback(() => {
+    setCurrentTerm((prev) => prev || inferTermFromTerms(allTerms));
+  }, [allTerms]);
 
   // Pure local switch — no API call, no persistence
   const changeTerm = useCallback((termId) => {
@@ -37,7 +40,7 @@ export function TermProvider({ children }) {
   }, [allTerms]);
 
   return (
-    <TermContext.Provider value={{ allTerms, currentTerm, changeTerm, loading: false }}>
+    <TermContext.Provider value={{ allTerms, currentTerm, changeTerm, inferTerm, loading: false }}>
       {children}
     </TermContext.Provider>
   );

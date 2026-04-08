@@ -255,7 +255,7 @@ export default function ProfilePage() {
             <p className="text-sm text-indigo-100">用户中心</p>
             <h1 className="mt-1 text-3xl font-bold">{student?.name || "当前用户"}</h1>
             <p className="mt-2 text-sm text-indigo-100">
-              年级：{profile.grade || "-"} · 学号：{profile.student_no || "-"}
+              年级：{currentTerm?.name || profile.grade || "-"} · 学号：{profile.student_no || "-"}
             </p>
             <p className="mt-1 text-sm text-indigo-100">
               学校：{profile.school_name || "-"} · 班级：{profile.class_name || "-"}

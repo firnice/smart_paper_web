@@ -1,11 +1,14 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { KeyRound, LogIn, UserRound } from "lucide-react";
-import { studentLogin } from "../../services/api.js";
+import { studentLogin, adminLogin } from "../../services/api.js";
 import { saveStudentSession } from "../../utils/studentSession.js";
+import { saveAdminSession } from "../../utils/adminSession.js";
+import { useTerm } from "../../context/TermContext.jsx";
 
 export default function StudentLoginPage() {
   const navigate = useNavigate();
+  const { inferTerm } = useTerm();
   const [account, setAccount] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -15,18 +18,30 @@ export default function StudentLoginPage() {
     event.preventDefault();
     setLoading(true);
     setError("");
+
+    // 先尝试学生登录
     try {
-      const data = await studentLogin({
-        account: account.trim(),
-        password,
-      });
+      const data = await studentLogin({ account: account.trim(), password });
       saveStudentSession(data);
+      inferTerm();
       navigate("/");
-    } catch (err) {
-      setError(err?.message || "登录失败，请核对账号密码或稍后重试");
-    } finally {
-      setLoading(false);
+      return;
+    } catch {
+      // 学生登录失败，继续尝试管理员
     }
+
+    // 再尝试管理员登录
+    try {
+      const data = await adminLogin({ username: account.trim(), password });
+      saveAdminSession(data);
+      navigate("/admin/students", { replace: true });
+      return;
+    } catch {
+      // 两者都失败
+    }
+
+    setLoading(false);
+    setError("账号或密码错误，请重试");
   };
 
   return (
