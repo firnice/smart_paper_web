@@ -22,7 +22,14 @@ import { rememberOriginalImageForQuestion } from "../originalImageCache.js";
 
 const DEFAULT_PAPER_CROP = { x: 18, y: 20, w: 60, h: 28 };
 const DEFAULT_SVG_CROP = { x: 24, y: 24, w: 36, h: 28 };
-const GRADE_OPTIONS = ["一年级", "二年级", "三年级", "四年级", "五年级", "六年级"];
+const GRADE_OPTIONS = [
+  "一年级上", "一年级下",
+  "二年级上", "二年级下",
+  "三年级上", "三年级下",
+  "四年级上", "四年级下",
+  "五年级上", "五年级下",
+  "六年级上", "六年级下",
+];
 
 function getErrorMessage(error) {
   return String(error?.message || error || "操作失败");
@@ -97,6 +104,7 @@ export default function useComposer({
   refresh,
   setSuccess,
   setFailure,
+  navigate,
 }) {
   const uploadInputRef = useRef(null);
   const { currentTerm } = useTerm();
@@ -237,7 +245,7 @@ export default function useComposer({
         ocrItemId: questionId,
         text: normalizeTextForCard(item.text) || `第${questionId}题`,
         subject: analysis?.subject || subjectOptions[0] || "数学",
-        grade: profile.grade || "三年级",
+        grade: profile.grade || GRADE_OPTIONS[4],
         errorType: analysis?.category || categoryOptions[0]?.name || "计算错误",
         reason: analysis?.error_reason || errorReasonOptions[0]?.name || "粗心抄错",
         selected: true,
@@ -505,7 +513,7 @@ export default function useComposer({
           ].filter(Boolean).join("\n");
           const imageData = question.svgStatus === "generated"
             ? question.svgPreviewUrl
-            : question.questionImageUrl || question.diagramImageUrl || sourceImage.data;
+            : null;
 
           const createdItem = await createWrongQuestion({
             student_id: Number(studentId),
@@ -543,6 +551,7 @@ export default function useComposer({
             setSaveState({ status: "idle", error: "", savedCount: 0, total: 0 });
             onCloseComposer();
             setSuccess(`已完成前端演示保存 ${selectedQuestions.length} 道，实际入库接口待接入`);
+            navigate?.("/workspace");
             return;
           }
           throw error;
@@ -553,6 +562,7 @@ export default function useComposer({
       setSaveState({ status: "idle", error: "", savedCount: 0, total: 0 });
       onCloseComposer();
       setSuccess(`已保存 ${savedCount} 道错题`);
+      navigate?.("/workspace");
     } catch (error) {
       const total = selectedQuestions.length;
       const message = getErrorMessage(error) || "保存失败";
@@ -581,7 +591,10 @@ export default function useComposer({
   const subjectChoices = Array.from(new Set([...(subjectOptions || []), "数学", "语文", "英语", "科学"].filter(Boolean)));
   const errorTypeChoices = Array.from(new Set([...(categoryOptions || []).map((item) => item.name), "计算错误", "概念模糊"].filter(Boolean)));
   const reasonSuggestions = Array.from(new Set((errorReasonOptions || []).map((item) => item.name).filter(Boolean)));
-  const gradeChoices = Array.from(new Set([profile.grade, ...GRADE_OPTIONS].filter(Boolean)));
+  const gradeChoices = Array.from(new Set([
+    GRADE_OPTIONS.includes(profile.grade) ? profile.grade : null,
+    ...GRADE_OPTIONS,
+  ].filter(Boolean)));
   const activeSvgQuestion = croppingSvgId === null
     ? null
     : questions.find((question) => question.id === croppingSvgId) || null;

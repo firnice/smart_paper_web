@@ -38,6 +38,7 @@ function StepIndicator({ step }) {
 
 export default function ComposerModal({ composer }) {
   const [isDragActive, setIsDragActive] = useState(false);
+  const [showPromptEditor, setShowPromptEditor] = useState(false);
 
   const {
     uploadInputRef,
@@ -305,17 +306,6 @@ export default function ComposerModal({ composer }) {
                   </span>
                 </div>
 
-                <div className="mb-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-                  <label className="mb-2 block text-sm font-medium text-gray-700">识别 Prompt</label>
-                  <textarea
-                    rows={2}
-                    value={recognitionPrompt}
-                    className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm leading-relaxed text-gray-800 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100"
-                    placeholder="输入识别 prompt"
-                    onChange={(event) => setRecognitionPrompt(event.target.value)}
-                  />
-                </div>
-
                 <div className="space-y-3">
                   {questions.map((question) => (
                     <ComposerQuestionCard
@@ -323,7 +313,6 @@ export default function ComposerModal({ composer }) {
                       question={question}
                       paperImageUrl={sourceImage.data}
                       subjectOptions={subjectChoices}
-                      gradeOptions={gradeChoices}
                       errorTypeOptions={errorTypeChoices}
                       isPaperExpanded={expandedPaperId === question.id}
                       isPromptExpanded={expandedPromptId === question.id}
@@ -339,6 +328,43 @@ export default function ComposerModal({ composer }) {
                 </div>
               </div>
             ) : null}
+          </div>
+
+          {/* 提示词抽屉：点重新识别后从 footer 上方滑出 */}
+          <div
+            className={`flex-shrink-0 overflow-hidden border-t border-blue-100 bg-blue-50 transition-all duration-300 ${
+              showPromptEditor ? "max-h-48 opacity-100" : "max-h-0 opacity-0"
+            }`}
+          >
+            <div className="px-6 py-4">
+              <div className="mb-2 flex items-center justify-between">
+                <label className="text-sm font-medium text-gray-700">提示词</label>
+                <button
+                  type="button"
+                  onClick={() => setShowPromptEditor(false)}
+                  className="rounded p-0.5 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <textarea
+                rows={3}
+                value={recognitionPrompt}
+                onChange={(e) => setRecognitionPrompt(e.target.value)}
+                placeholder="修改提示词后点击确认识别"
+                className="w-full resize-none rounded-xl border border-blue-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-gray-800 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              />
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => { setShowPromptEditor(false); onRecognize(lastRecognitionMode, { prompt: recognitionPrompt }); }}
+                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  确认识别
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="flex flex-shrink-0 items-center justify-between border-t border-gray-100 bg-white px-6 py-4">
@@ -399,7 +425,7 @@ export default function ComposerModal({ composer }) {
                 <>
                   <button
                     type="button"
-                    onClick={() => onRecognize(lastRecognitionMode, { prompt: recognitionPrompt })}
+                    onClick={() => setShowPromptEditor((v) => !v)}
                     className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-5 py-2.5 font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
                   >
                     <RefreshCw className="h-4 w-4" />

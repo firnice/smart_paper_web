@@ -4,6 +4,7 @@ import { readStudentSession } from "../../utils/studentSession.js";
 
 const NAV_ITEMS = [
   { to: "/workspace", label: "错题本", shortLabel: "错题本", Icon: BookOpen },
+  { to: "/capture", label: "录入错题", shortLabel: "录入", Icon: Camera },
   { to: "/print", label: "打印", shortLabel: "打印", Icon: Printer },
   { to: "/profile", label: "我的", shortLabel: "我的", Icon: User },
 ];

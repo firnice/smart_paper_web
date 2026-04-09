@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTerm } from "../../context/TermContext.jsx";
 import {
@@ -22,7 +22,6 @@ import ComposerModal from "./components/ComposerModal.jsx";
 export default function WorkspacePage({ defaultOpenComposer = false, pageMode = "workspace" }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const autoOpenedRef = useRef(false);
 
   const [session, setSession] = useState(() => readStudentSession());
   const { currentTerm } = useTerm();
@@ -98,6 +97,7 @@ export default function WorkspacePage({ defaultOpenComposer = false, pageMode = 
     refresh,
     setSuccess,
     setFailure,
+    navigate,
   });
 
   useEffect(() => {
@@ -120,10 +120,9 @@ export default function WorkspacePage({ defaultOpenComposer = false, pageMode = 
   }, [location.state?.openComposer]);
 
   useEffect(() => {
-    if (!defaultOpenComposer || autoOpenedRef.current) return;
+    if (!defaultOpenComposer) return;
     composer.onOpenComposer();
-    autoOpenedRef.current = true;
-  }, [composer, defaultOpenComposer]);
+  }, [location.pathname, defaultOpenComposer]);
 
   const onChangeStatus = async (wrongQuestionId, status) => {
     if (!studentId) return;

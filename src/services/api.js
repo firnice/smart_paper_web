@@ -57,8 +57,26 @@ function buildUrl(path, query = {}, base = API_BASE) {
   return url.toString();
 }
 
+function studentHeaders() {
+  try {
+    const raw = localStorage.getItem("smart_paper_student_session");
+    const token = raw ? JSON.parse(raw)?.session_token || "" : "";
+    return token ? { "X-Student-Token": token } : {};
+  } catch {
+    return {};
+  }
+}
+
 async function requestJson(path, options = {}, query = {}) {
   const url = buildUrl(path, query);
+  // 自动注入学生 token（admin 接口已自带 adminHeaders，此处不会重复）
+  const isAdminPath = path.startsWith("/api/admin") || path.startsWith("/api/auth/admin");
+  if (!isAdminPath) {
+    options = {
+      ...options,
+      headers: { ...studentHeaders(), ...(options.headers || {}) },
+    };
+  }
   let response;
   try {
     response = await fetch(url, options);
@@ -79,6 +97,23 @@ async function requestJson(path, options = {}, query = {}) {
   }
 
   if (!response.ok) {
+    // 401 — token 失效，仅在已有 session 时才清 session 并跳登录页
+    // 登录接口本身返回 401（账号密码错误）不触发跳转
+    if (response.status === 401) {
+      const isAuthEndpoint = path.includes("/auth/");
+      const hasSession =
+        !!localStorage.getItem("smart_paper_student_session") ||
+        !!localStorage.getItem("smart_paper_admin_session");
+      if (!isAuthEndpoint && hasSession) {
+        localStorage.removeItem("smart_paper_student_session");
+        localStorage.removeItem("smart_paper_admin_session");
+        if (typeof window !== "undefined") {
+          window.location.href = "/login";
+        }
+        throw new Error("登录已过期，请重新登录");
+      }
+    }
+
     const serviceUnavailableMessage = "服务暂时不可用，请稍后重试";
     const raw = await response.text();
     if (!raw) {
@@ -141,16 +176,6 @@ export async function extractQuestions(file, options = {}) {
   return requestJson("/api/ocr/extract", {
     method: "POST",
     body: formData,
-  });
-}
-
-export async function generateDiagramCrop(payload) {
-  return requestJson("/api/ocr/diagram/crop", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
   });
 }
 
@@ -296,7 +321,7 @@ export async function updateWrongQuestion(wrongQuestionId, payload) {
 
 export async function deleteWrongQuestion(wrongQuestionId) {
   const url = buildUrl(`/api/wrong-questions/${wrongQuestionId}`);
-  const response = await fetch(url, { method: "DELETE" });
+  const response = await fetch(url, { method: "DELETE", headers: studentHeaders() });
   if (!response.ok) {
     const raw = await response.text();
     throw new Error(raw || `Request failed: ${response.status}`);
@@ -316,10 +341,7 @@ export async function listStudyRecords(wrongQuestionId, params = {}) {
 }
 
 export async function getStatisticsOverview(studentId, params = {}) {
-  return requestJson("/api/statistics/overview", {}, {
-    student_id: studentId,
-    ...params,
-  });
+  return requestJson("/api/statistics/overview", {}, params);
 }
 
 export async function getStudentLoginConfig() {
@@ -370,12 +392,12 @@ export async function getTrendAnalysis(id) {
   return requestJson(`/api/analysis/trend/${id}`);
 }
 
-export async function getLatestTrendAnalysis(studentId) {
-  return requestJson(`/api/analysis/trend/latest?student_id=${studentId}`);
+export async function getLatestTrendAnalysis() {
+  return requestJson("/api/analysis/trend/latest");
 }
 
-export async function listTrendAnalyses(studentId) {
-  return requestJson(`/api/analysis/trend?student_id=${studentId}`);
+export async function listTrendAnalyses() {
+  return requestJson("/api/analysis/trend");
 }
 
 // ---- Admin: Agent 配置管理 ----
@@ -400,6 +422,109 @@ export async function testAgent(nodeName, payload = {}) {
   return requestJson(`/api/admin/agents/${nodeName}/test`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+// ── Admin API ─────────────────────────────────────────────────────────────────
+
+function adminHeaders() {
+  let token = "";
+  try {
+    const raw = localStorage.getItem("smart_paper_admin_session");
+    if (raw) token = JSON.parse(raw)?.session_token || "";
+  } catch {
+    // ignore
+  }
+  return { "Content-Type": "application/json", "X-Admin-Token": token };
+}
+
+export async function adminLogin(payload) {
+  return requestJson("/api/auth/admin-login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function listStudents(params = {}) {
+  return requestJson("/api/users", { headers: adminHeaders() }, { role: "student", ...params });
+}
+
+export async function createStudent(payload) {
+  return requestJson("/api/users", {
+    method: "POST",
+    headers: adminHeaders(),
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteUser(userId) {
+  const url = buildUrl(`/api/users/${userId}`);
+  const response = await fetch(url, { method: "DELETE", headers: adminHeaders() });
+  if (!response.ok && response.status !== 204) {
+    const raw = await response.text();
+    let detail = "";
+    try { detail = JSON.parse(raw)?.detail; } catch { detail = raw; }
+    throw new Error(detail || `Delete failed: ${response.status}`);
+  }
+}
+
+export async function listModelProviders() {
+  return requestJson("/api/admin/model-providers", { headers: adminHeaders() });
+}
+
+export async function createModelProvider(payload) {
+  return requestJson("/api/admin/model-providers", {
+    method: "POST",
+    headers: adminHeaders(),
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateModelProvider(id, payload) {
+  return requestJson(`/api/admin/model-providers/${id}`, {
+    method: "PUT",
+    headers: adminHeaders(),
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteModelProvider(id) {
+  const url = buildUrl(`/api/admin/model-providers/${id}`);
+  const response = await fetch(url, { method: "DELETE", headers: adminHeaders() });
+  if (!response.ok && response.status !== 204) {
+    const raw = await response.text();
+    let detail = "";
+    try { detail = JSON.parse(raw)?.detail; } catch { detail = raw; }
+    throw new Error(detail || `Delete failed: ${response.status}`);
+  }
+}
+
+export async function getLlmStatsOverview() {
+  return requestJson("/api/admin/llm-stats/overview", { headers: adminHeaders() });
+}
+
+export async function listLlmLogs(params = {}) {
+  return requestJson("/api/admin/llm-logs", { headers: adminHeaders() }, params);
+}
+
+export async function adminListAgents() {
+  return requestJson("/api/admin/agents", { headers: adminHeaders() });
+}
+
+export async function adminUpdateAgent(nodeName, payload) {
+  return requestJson(`/api/admin/agents/${nodeName}`, {
+    method: "PUT",
+    headers: adminHeaders(),
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function adminTestAgent(nodeName, payload = {}) {
+  return requestJson(`/api/admin/agents/${nodeName}/test`, {
+    method: "POST",
+    headers: adminHeaders(),
     body: JSON.stringify(payload),
   });
 }

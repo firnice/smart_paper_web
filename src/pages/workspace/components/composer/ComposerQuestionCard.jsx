@@ -16,7 +16,6 @@ export default function ComposerQuestionCard({
   question,
   paperImageUrl,
   subjectOptions,
-  gradeOptions,
   errorTypeOptions,
   isPaperExpanded,
   isPromptExpanded,
@@ -89,44 +88,43 @@ export default function ComposerQuestionCard({
 
       <div className="flex flex-wrap items-end justify-between gap-3 border-t border-gray-200 px-4 py-3">
         <div className="flex flex-1 flex-wrap items-center gap-2">
-          <select
-            value={question.subject}
-            className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-blue-500"
-            onChange={(event) => onChangeField(question.id, "subject", event.target.value)}
-          >
-            {subjectOptions.map((option) => (
-              <option key={option} value={option}>{option}</option>
-            ))}
-          </select>
+          <label className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white pl-2 focus-within:ring-2 focus-within:ring-blue-500">
+            <span className="whitespace-nowrap text-xs text-gray-400">科目</span>
+            <select
+              value={question.subject}
+              className="rounded-lg bg-transparent py-1.5 pr-2 text-sm text-gray-700 outline-none"
+              onChange={(event) => onChangeField(question.id, "subject", event.target.value)}
+            >
+              {subjectOptions.map((option) => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+          </label>
 
-          <select
-            value={question.grade}
-            className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-blue-500"
-            onChange={(event) => onChangeField(question.id, "grade", event.target.value)}
-          >
-            {gradeOptions.map((option) => (
-              <option key={option} value={option}>{option}</option>
-            ))}
-          </select>
+<label className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white pl-2 focus-within:ring-2 focus-within:ring-blue-500">
+            <span className="whitespace-nowrap text-xs text-gray-400">错误类型</span>
+            <select
+              value={question.errorType}
+              className="rounded-lg bg-transparent py-1.5 pr-2 text-sm text-gray-700 outline-none"
+              onChange={(event) => onChangeField(question.id, "errorType", event.target.value)}
+            >
+              {errorTypeOptions.map((option) => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+          </label>
 
-          <select
-            value={question.errorType}
-            className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-blue-500"
-            onChange={(event) => onChangeField(question.id, "errorType", event.target.value)}
-          >
-            {errorTypeOptions.map((option) => (
-              <option key={option} value={option}>{option}</option>
-            ))}
-          </select>
-
-          <input
-            type="text"
-            list="composer-reason-options"
-            value={question.reason}
-            placeholder="错误原因"
-            className="min-w-32 flex-1 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-blue-500"
-            onChange={(event) => onChangeField(question.id, "reason", event.target.value)}
-          />
+          <label className="flex min-w-40 flex-1 items-center gap-1 rounded-lg border border-gray-200 bg-white pl-2 focus-within:ring-2 focus-within:ring-blue-500">
+            <span className="whitespace-nowrap text-xs text-gray-400">错误原因</span>
+            <input
+              type="text"
+              list="composer-reason-options"
+              value={question.reason}
+              placeholder="填写原因"
+              className="flex-1 bg-transparent py-1.5 pr-2 text-sm text-gray-700 outline-none"
+              onChange={(event) => onChangeField(question.id, "reason", event.target.value)}
+            />
+          </label>
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-1">
