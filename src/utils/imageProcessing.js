@@ -79,7 +79,22 @@ export async function rotateImageDataUrl(sourceDataUrl, direction = "right", out
 export function normalizeOcrImageUrl(url) {
   const value = String(url || "").trim();
   if (!value) return "";
-  if (value.startsWith("http://") || value.startsWith("https://") || value.startsWith("data:")) {
+  if (value.startsWith("data:")) return value;
+  // If the URL has a different origin than the current page, strip the host
+  // so the request goes through the Vite proxy (dev) or nginx (prod).
+  if (value.startsWith("http://") || value.startsWith("https://")) {
+    if (typeof window !== "undefined") {
+      const currentOrigin = window.location.origin;
+      try {
+        const parsed = new URL(value);
+        if (parsed.origin !== currentOrigin) {
+          // Keep only the path — proxy will forward to the backend
+          return parsed.pathname + parsed.search;
+        }
+      } catch {
+        // fall through
+      }
+    }
     return value;
   }
   const base = String(
