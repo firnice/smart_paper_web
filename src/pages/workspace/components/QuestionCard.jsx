@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Dumbbell, Trash2, Pencil, Bookmark, BookmarkCheck, CheckCircle2, Circle, ChevronDown, ChevronUp } from "lucide-react";
+import { Dumbbell, Trash2, Pencil, Bookmark, BookmarkCheck, CheckCircle2, Circle, ChevronDown, ChevronUp, ImagePlay, ScanText, Loader2 } from "lucide-react";
 
 const STATUS_STYLE = {
   new: { bg: "#FEF2F2", color: "#EF4444", label: "未掌握" },
@@ -30,6 +30,9 @@ export default function QuestionCard({
   onToggleBookmark,
   onStartEdit,
   onDelete,
+  onRegenerateSvg,
+  onReanalyze,
+  regeneratingId,
 }) {
   const [showFullImage, setShowFullImage] = useState(false);
   const navigate = useNavigate();
@@ -160,22 +163,52 @@ export default function QuestionCard({
         </button>
       </div>
 
-      {/* Edit / Delete */}
-      <div className="flex justify-end gap-4 border-t border-gray-50 px-4 py-2.5">
-        <button
-          type="button"
-          className="flex items-center gap-1 text-[12px] text-gray-400 transition active:text-indigo-500"
-          onClick={() => onStartEdit(item)}
-        >
-          <Pencil className="h-3.5 w-3.5" /> 编辑
-        </button>
-        <button
-          type="button"
-          className="flex items-center gap-1 text-[12px] text-gray-400 transition active:text-red-500"
-          onClick={() => onDelete(item)}
-        >
-          <Trash2 className="h-3.5 w-3.5" /> 删除
-        </button>
+      {/* Edit / Delete / Regenerate */}
+      <div className="flex items-center justify-between border-t border-gray-50 px-4 py-2.5">
+        <div className="flex gap-3">
+          {onRegenerateSvg && (
+            <button
+              type="button"
+              disabled={!!regeneratingId}
+              className="flex items-center gap-1 text-[12px] text-gray-400 transition active:text-purple-500 disabled:opacity-40"
+              onClick={() => onRegenerateSvg(item)}
+            >
+              {regeneratingId === `svg-${item.id}`
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                : <ImagePlay className="h-3.5 w-3.5" />}
+              重新配图
+            </button>
+          )}
+          {onReanalyze && (
+            <button
+              type="button"
+              disabled={!!regeneratingId}
+              className="flex items-center gap-1 text-[12px] text-gray-400 transition active:text-indigo-500 disabled:opacity-40"
+              onClick={() => onReanalyze(item)}
+            >
+              {regeneratingId === `analyze-${item.id}`
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                : <ScanText className="h-3.5 w-3.5" />}
+              重新识别
+            </button>
+          )}
+        </div>
+        <div className="flex gap-4">
+          <button
+            type="button"
+            className="flex items-center gap-1 text-[12px] text-gray-400 transition active:text-indigo-500"
+            onClick={() => onStartEdit(item)}
+          >
+            <Pencil className="h-3.5 w-3.5" /> 编辑
+          </button>
+          <button
+            type="button"
+            className="flex items-center gap-1 text-[12px] text-gray-400 transition active:text-red-500"
+            onClick={() => onDelete(item)}
+          >
+            <Trash2 className="h-3.5 w-3.5" /> 删除
+          </button>
+        </div>
       </div>
     </article>
   );

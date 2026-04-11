@@ -3,6 +3,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useTerm } from "../../context/TermContext.jsx";
 import {
   deleteWrongQuestion,
+  generateDiagramSvg,
+  analyzeQuestion,
   getStatisticsOverview,
   listErrorReasons,
   listSubjects,
@@ -10,6 +12,7 @@ import {
   listWrongQuestions,
   updateWrongQuestion,
 } from "../../services/api.js";
+import { normalizeOcrImageUrl } from "../../utils/imageProcessing.js";
 import { clearStudentSession, readStudentSession } from "../../utils/studentSession.js";
 import { DEFAULT_SUBJECT_OPTIONS, EDIT_INITIAL, STATUS_LABEL } from "./constants.js";
 import { buildStats, mapWrongQuestionItem } from "./mappers.js";
@@ -36,6 +39,7 @@ export default function WorkspacePage({ defaultOpenComposer = false, pageMode = 
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [regeneratingId, setRegeneratingId] = useState(null); // svg or analyze
 
   const studentId = session?.student?.id;
   const profile = session?.student?.student_profile || {};
@@ -200,6 +204,57 @@ export default function WorkspacePage({ defaultOpenComposer = false, pageMode = 
     }
   };
 
+  const onRegenerateSvg = async (item) => {
+    if (regeneratingId) return;
+    setRegeneratingId(`svg-${item.id}`);
+    setError("");
+    try {
+      const response = await generateDiagramSvg({
+        item_id: item.id,
+        question_text: item.content || item.title || "",
+        question_image_url: item.image_data || "",
+        diagram_image_url: item.image_data || "",
+      });
+      const svgUrl = normalizeOcrImageUrl(response?.diagram_svg_url);
+      if (!svgUrl) throw new Error("配图生成失败，请重试");
+      await updateWrongQuestion(item.id, { image_url: response.diagram_svg_url });
+      await refresh();
+      setSuccess("配图已重新生成");
+    } catch (err) {
+      setFailure(err?.message || "配图生成失败");
+    } finally {
+      setRegeneratingId(null);
+    }
+  };
+
+  const onReanalyze = async (item) => {
+    if (regeneratingId) return;
+    setRegeneratingId(`analyze-${item.id}`);
+    setError("");
+    try {
+      const result = await analyzeQuestion({
+        question_text: item.content || item.title || "",
+        grade: profile.grade || "",
+      });
+      if (!result) throw new Error("识别失败，请重试");
+      const patch = {};
+      if (result.title) patch.title = result.title;
+      if (result.subject) {
+        const matched = subjectOptions.find((s) => s.name === result.subject);
+        if (matched) patch.subject_id = matched.id;
+      }
+      if (Object.keys(patch).length > 0) {
+        await updateWrongQuestion(item.id, patch);
+        await refresh();
+      }
+      setSuccess("题目信息已重新识别");
+    } catch (err) {
+      setFailure(err?.message || "题目识别失败");
+    } finally {
+      setRegeneratingId(null);
+    }
+  };
+
   if (!session?.student) return null;
 
   const student = session.student;
@@ -224,6 +279,9 @@ export default function WorkspacePage({ defaultOpenComposer = false, pageMode = 
         onToggleBookmark={onToggleBookmark}
         onStartEdit={onStartEdit}
         onDelete={onDeleteWrongQuestion}
+        onRegenerateSvg={onRegenerateSvg}
+        onReanalyze={onReanalyze}
+        regeneratingId={regeneratingId}
       />
 
       <EditModal

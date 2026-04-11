@@ -10,6 +10,9 @@ export default function QuestionList({
   onToggleBookmark,
   onStartEdit,
   onDelete,
+  onRegenerateSvg,
+  onReanalyze,
+  regeneratingId,
 }) {
   return (
     <section className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm">
@@ -45,6 +48,9 @@ export default function QuestionList({
               onToggleBookmark={onToggleBookmark}
               onStartEdit={onStartEdit}
               onDelete={onDelete}
+              onRegenerateSvg={onRegenerateSvg}
+              onReanalyze={onReanalyze}
+              regeneratingId={regeneratingId}
             />
           ))}
         </div>
