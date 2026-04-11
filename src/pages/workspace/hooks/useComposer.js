@@ -414,6 +414,7 @@ export default function useComposer({
 
     try {
       let resolvedSvgUrl = "";
+      let backendUnavailable = false;
 
       try {
         const response = await generateDiagramSvg({
@@ -428,6 +429,13 @@ export default function useComposer({
         if (!isBackendUnavailable(message)) {
           throw error;
         }
+        backendUnavailable = true;
+      }
+
+      // Only fall back to local preview when backend is completely unreachable.
+      // If the backend responded but returned no SVG URL, treat it as an error.
+      if (!resolvedSvgUrl && !backendUnavailable) {
+        throw new Error("配图生成失败，请重试");
       }
 
       const previewUrl = resolvedSvgUrl || await buildLocalSvgPreview(question);
