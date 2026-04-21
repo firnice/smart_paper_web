@@ -586,7 +586,7 @@ export default function PrintPage() {
 
       setExportUrl(downloadUrl);
       window.open(downloadUrl, "_blank", "noopener,noreferrer");
-      toast.success("PDF 已生成");
+      toast.success(response?.filename ? `PDF 已生成：${response.filename}` : "PDF 已生成");
     } catch (err) {
       toast.error(err?.message || "导出 PDF 失败");
     } finally {
