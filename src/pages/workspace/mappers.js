@@ -66,6 +66,7 @@ export function mapWrongQuestionItem(item) {
     error_count: Number(item?.error_count || 0),
     review_count: 0,
     image_data: resolveAssetUrl(item?.image_url),
+    svg_data: resolveAssetUrl(item?.svg || item?.image_url),
     original_image_data: originalImage?.data || "",
   };
 }

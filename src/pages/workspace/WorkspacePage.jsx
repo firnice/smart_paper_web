@@ -21,6 +21,36 @@ import StatsBar from "./components/StatsBar.jsx";
 import QuestionList from "./components/QuestionList.jsx";
 import EditModal from "./components/EditModal.jsx";
 import ComposerModal from "./components/ComposerModal.jsx";
+import SvgRegenerateModal from "./components/SvgRegenerateModal.jsx";
+
+function isSvgAsset(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) return false;
+  return normalized.startsWith("data:image/svg+xml") || normalized.includes(".svg");
+}
+
+function buildSvgRegeneratePayload(item, prompt) {
+  const latestSvgUrl = isSvgAsset(item?.svg_data)
+    ? item.svg_data
+    : (isSvgAsset(item?.image_data) ? item.image_data : "");
+  const originalImageUrl = String(item?.original_image_data || "").trim();
+  const fallbackImageUrl = !originalImageUrl && !latestSvgUrl ? String(item?.image_data || "").trim() : "";
+
+  const payload = {
+    item_id: item?.id || 0,
+    question_text: item?.content || item?.title || "",
+    prompt: String(prompt || "").trim(),
+  };
+
+  if (originalImageUrl) payload.original_image_url = originalImageUrl;
+  if (latestSvgUrl) payload.latest_svg_url = latestSvgUrl;
+  if (fallbackImageUrl) {
+    payload.question_image_url = fallbackImageUrl;
+    payload.diagram_image_url = fallbackImageUrl;
+  }
+
+  return payload;
+}
 
 export default function WorkspacePage({ defaultOpenComposer = false, pageMode = "workspace" }) {
   const navigate = useNavigate();
@@ -40,6 +70,7 @@ export default function WorkspacePage({ defaultOpenComposer = false, pageMode = 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [regeneratingId, setRegeneratingId] = useState(null); // svg or analyze
+  const [svgPromptModal, setSvgPromptModal] = useState({ item: null, prompt: "" });
 
   const studentId = session?.student?.id;
   const profile = session?.student?.student_profile || {};
@@ -204,20 +235,49 @@ export default function WorkspacePage({ defaultOpenComposer = false, pageMode = 
     }
   };
 
-  const onRegenerateSvg = async (item) => {
+  const onRegenerateSvg = (item) => {
     if (regeneratingId) return;
+    setSvgPromptModal({
+      item,
+      prompt: "",
+    });
+    setError("");
+    setNotice("");
+  };
+
+  const closeSvgPromptModal = () => {
+    if (regeneratingId) return;
+    setSvgPromptModal({ item: null, prompt: "" });
+  };
+
+  const onSubmitSvgPrompt = async (event) => {
+    event.preventDefault();
+    const item = svgPromptModal.item;
+    if (!item || regeneratingId) return;
+
+    const prompt = String(svgPromptModal.prompt || "").trim();
+    if (!prompt) {
+      setFailure("请先填写本次配图修改要求，再重新生成。");
+      return;
+    }
+
+    const payload = buildSvgRegeneratePayload(item, prompt);
+    if (!payload.original_image_url && !payload.latest_svg_url && !payload.question_image_url) {
+      setFailure("当前缺少可参考的原图或配图，暂时无法重新生成。");
+      return;
+    }
+
     setRegeneratingId(`svg-${item.id}`);
     setError("");
     try {
-      const response = await generateDiagramSvg({
-        item_id: item.id,
-        question_text: item.content || item.title || "",
-        question_image_url: item.image_data || "",
-        diagram_image_url: item.image_data || "",
-      });
+      const response = await generateDiagramSvg(payload);
       const svgUrl = normalizeOcrImageUrl(response?.diagram_svg_url);
       if (!svgUrl) throw new Error("配图生成失败，请重试");
-      await updateWrongQuestion(item.id, { image_url: response.diagram_svg_url });
+      await updateWrongQuestion(item.id, {
+        image_url: response.diagram_svg_url,
+        svg: response.diagram_svg_url,
+      });
+      setSvgPromptModal({ item: null, prompt: "" });
       await refresh();
       setSuccess("配图已重新生成");
     } catch (err) {
@@ -291,6 +351,15 @@ export default function WorkspacePage({ defaultOpenComposer = false, pageMode = 
         errorReasonOptions={errorReasonOptions}
         onSubmitEdit={onSubmitEdit}
         onClose={() => setEditingItem(null)}
+      />
+
+      <SvgRegenerateModal
+        item={svgPromptModal.item}
+        prompt={svgPromptModal.prompt}
+        setPrompt={(value) => setSvgPromptModal((current) => ({ ...current, prompt: value }))}
+        submitting={Boolean(svgPromptModal.item) && regeneratingId === `svg-${svgPromptModal.item.id}`}
+        onSubmit={onSubmitSvgPrompt}
+        onClose={closeSvgPromptModal}
       />
 
       <ComposerModal
