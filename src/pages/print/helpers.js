@@ -31,6 +31,15 @@ function hashString(value) {
   return Math.abs(hash);
 }
 
+export function formatShortDate(isoLike) {
+  if (!isoLike) return "";
+  const date = new Date(isoLike);
+  if (Number.isNaN(date.getTime())) return "";
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${month}-${day}`;
+}
+
 function inferTerm(dateLike, grade) {
   if (!dateLike) return "";
   return getDefaultSchoolTerm(dateLike, grade);
@@ -85,6 +94,9 @@ export function mapWrongQuestionToPrintQuestion(item, fallbackGrade = "") {
     hasImg: Boolean(imageUrl),
     imageUrl,
     imageName: item?.image_name || "",
+    printCount: item?.print_count || 0,
+    lastPrintedAt: item?.last_printed_at || "",
+    hasBeenPrinted: (item?.print_count || 0) > 0,
     errorReason: reasons.map((reason) => reason?.name).filter(Boolean).join(" / ") || "待分析",
     keywords: [
       item?.subject?.name,
