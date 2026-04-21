@@ -41,7 +41,7 @@ function resolveInitialSelection(items, requestedIds, previousIds) {
   }
 
   return items
-    .filter((item) => item.status !== "mastered")
+    .filter((item) => item.status !== "mastered" && !item.hasBeenPrinted)
     .slice(0, 6)
     .map((item) => item.id);
 }
