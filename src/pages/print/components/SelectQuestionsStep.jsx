@@ -1,3 +1,5 @@
+import { formatShortDate } from "../helpers.js";
+
 function renderMetaBadge(text, tone = "slate") {
   const toneClassMap = {
     indigo: "bg-indigo-50 text-indigo-600",
@@ -13,6 +15,18 @@ function renderMetaBadge(text, tone = "slate") {
   );
 }
 
+function PrintedBadge({ question }) {
+  if (!question?.hasBeenPrinted) return null;
+  const dateText = formatShortDate(question.lastPrintedAt);
+  const suffix = dateText ? ` · 最近 ${dateText}` : "";
+  return (
+    <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+      <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+      已打印 {question.printCount} 次{suffix}
+    </span>
+  );
+}
+
 function FullQuestionCard({ question }) {
   return (
     <div className="min-w-0">
@@ -23,6 +37,7 @@ function FullQuestionCard({ question }) {
           <span className="h-1.5 w-1.5 rounded-full bg-current" />
           {question.mastery}
         </span>
+        <PrintedBadge question={question} />
       </div>
       <h4 className="text-[14px] font-semibold text-slate-900">{question.title}</h4>
       <p className="mt-2 whitespace-pre-line text-[14px] leading-7 text-slate-700">{question.content}</p>
@@ -51,6 +66,7 @@ function CompactQuestionCard({ question }) {
           <span className="h-1.5 w-1.5 rounded-full bg-current" />
           {question.mastery}
         </span>
+        <PrintedBadge question={question} />
       </div>
       <h4 className="text-[14px] font-semibold leading-6 text-slate-900 line-clamp-1">{question.title}</h4>
       <p className="mt-2 text-[13px] leading-6 text-slate-600 line-clamp-2">{question.content}</p>
@@ -77,6 +93,9 @@ function ListQuestionRow({ question }) {
         <span className="inline-flex rounded-full bg-rose-50 px-2.5 py-1 text-[11px] font-medium text-rose-600">
           {question.mastery}
         </span>
+      </div>
+      <div className="hidden md:block">
+        <PrintedBadge question={question} />
       </div>
     </>
   );
@@ -199,7 +218,7 @@ export default function SelectQuestionsStep({
                         : "border-[#F0F0F0] bg-white hover:border-slate-300 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
                     } ${
                       isListMode
-                        ? "grid items-center gap-3 px-3 py-3 grid-cols-[20px_72px_minmax(0,1fr)] md:grid-cols-[20px_92px_minmax(0,1fr)_112px_88px_96px]"
+                        ? "grid items-center gap-3 px-3 py-3 grid-cols-[20px_72px_minmax(0,1fr)] md:grid-cols-[20px_92px_minmax(0,1fr)_112px_88px_96px_140px]"
                         : "grid gap-4 p-4 md:grid-cols-[20px_minmax(0,1fr)]"
                     }`}
                   >
